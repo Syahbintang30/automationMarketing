@@ -1,0 +1,291 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum EmailVerificationStatus {
+  VERIFIED
+  UNVERIFIED
+  UNAVAILABLE
+  INVALID
+}
+
+enum QualificationStatus {
+  UNQUALIFIED
+  QUALIFIED
+  NEEDS_WEBSITE
+  DISQUALIFIED
+}
+
+enum OutreachStatus {
+  NOT_CONTACTED
+  DRAFT_CREATED
+  AWAITING_APPROVAL
+  APPROVED
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  BOUNCED
+  OPTED_OUT
+}
+
+enum DraftStatus {
+  PENDING
+  GENERATED
+  FAILED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REGENERATION_REQUESTED
+}
+
+enum SendStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  SUPPRESSED
+  CANCELLED
+}
+
+enum JobType {
+  LEAD_DISCOVERY
+  LEAD_ENRICHMENT
+  EMAIL_DRAFT_GENERATION
+  EXCEL_EXPORT
+  APPROVED_EMAIL_SENDING
+  CLEANUP_RETENTION
+  CAMPAIGN_SUMMARY
+}
+
+enum JobStatus {
+  QUEUED
+  ACTIVE
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id             String       @id @default(uuid())
+  email          String       @unique
+  passwordHash   String       @map("password_hash")
+  name           String
+  role           Role         @default(OPERATOR)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  auditLogs      AuditLog[]
+  approvedDrafts EmailDraft[] @relation("DraftApprover")
+
+  @@map("users")
+}
+
+model Campaign {
+  id                String         @id @default(uuid())
+  name              String
+  description       String?
+  targetProvince    String         @map("target_province")
+  targetCity        String?        @map("target_city")
+  businessCategory  String         @map("business_category")
+  serviceOffering   String         @map("service_offering")
+  status            CampaignStatus @default(DRAFT)
+  discoverySettings Json           @default("{}") @map("discovery_settings")
+  scheduleSettings  Json           @default("{}") @map("schedule_settings")
+  dailySendLimit    Int            @default(30) @map("daily_send_limit")
+  isPaused          Boolean        @default(false) @map("is_paused")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  leadCampaigns     LeadCampaign[]
+  emailDrafts       EmailDraft[]
+  sendLogs          EmailSendLog[]
+  jobExecutions     JobExecution[]
+
+  @@map("campaigns")
+}
+
+model Lead {
+  id                      String                  @id @default(uuid())
+  businessName            String                  @map("business_name")
+  businessCategory        String                  @map("business_category")
+  province                String
+  city                    String
+  businessAddress         String?                 @map("business_address")
+  websiteUrl              String?                 @map("website_url")
+  contactEmail            String?                 @map("contact_email")
+  normalizedEmail         String?                 @unique @map("normalized_email")
+  emailSourceUrl          String?                 @map("email_source_url")
+  emailVerificationStatus EmailVerificationStatus @default(UNVERIFIED) @map("email_verification_status")
+  dataSource              String                  @map("data_source")
+  sourceRecordId          String?                 @map("source_record_id")
+  qualificationStatus     QualificationStatus     @default(QUALIFIED) @map("qualification_status")
+  outreachStatus          OutreachStatus          @default(NOT_CONTACTED) @map("outreach_status")
+  lastContactedAt         DateTime?               @map("last_contacted_at")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+
+  leadCampaigns           LeadCampaign[]
+  emailDrafts             EmailDraft[]
+  sendLogs                EmailSendLog[]
+
+  @@index([province, city])
+  @@index([businessCategory])
+  @@index([outreachStatus])
+  @@index([qualificationStatus])
+  @@map("leads")
+}
+
+model LeadCampaign {
+  id                  String    @id @default(uuid())
+  campaignId          String    @map("campaign_id")
+  leadId              String    @map("lead_id")
+  qualificationResult String?   @map("qualification_result")
+  status              String    @default("ACTIVE")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  campaign            Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead                Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, leadId])
+  @@map("lead_campaigns")
+}
+
+model EmailDraft {
+  id               String         @id @default(uuid())
+  campaignId       String         @map("campaign_id")
+  leadId           String         @map("lead_id")
+  subject          String
+  body             String         @db.Text
+  aiProvider       String         @map("ai_provider")
+  model            String
+  generationStatus DraftStatus    @default(PENDING) @map("generation_status")
+  approvalStatus   ApprovalStatus @default(PENDING) @map("approval_status")
+  approvedById     String?        @map("approved_by_id")
+  approvedAt       DateTime?      @map("approved_at")
+  rejectionReason  String?        @map("rejection_reason")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  campaign         Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead             Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  approvedBy       User?          @relation("DraftApprover", fields: [approvedById], references: [id])
+  sendLogs         EmailSendLog[]
+
+  @@index([campaignId, approvalStatus])
+  @@map("email_drafts")
+}
+
+model EmailSendLog {
+  id                String     @id @default(uuid())
+  campaignId        String     @map("campaign_id")
+  leadId            String     @map("lead_id")
+  emailDraftId      String     @map("email_draft_id")
+  providerMessageId String?    @map("provider_message_id")
+  status            SendStatus @default(QUEUED)
+  attemptCount      Int        @default(0) @map("attempt_count")
+  errorCode         String?    @map("error_code")
+  errorMessage      String?    @map("error_message")
+  isDryRun          Boolean    @default(false) @map("is_dry_run")
+  sentAt            DateTime?  @map("sent_at")
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  campaign          Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead              Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  emailDraft        EmailDraft @relation(fields: [emailDraftId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, status])
+  @@index([sentAt])
+  @@map("email_send_logs")
+}
+
+model SuppressionEntry {
+  id              String   @id @default(uuid())
+  normalizedEmail String   @unique @map("normalized_email")
+  reason          String
+  source          String
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([normalizedEmail])
+  @@map("suppression_entries")
+}
+
+model JobExecution {
+  id             String    @id @default(uuid())
+  jobType        JobType   @map("job_type")
+  campaignId     String?   @map("campaign_id")
+  status         JobStatus @default(QUEUED)
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  processedCount Int       @default(0) @map("processed_count")
+  failedCount    Int       @default(0) @map("failed_count")
+  errorSummary   String?   @map("error_summary")
+  metadata       Json      @default("{}")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  campaign       Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([jobType, status])
+  @@map("job_executions")
+}
+
+model OAuthConnection {
+  id                    String    @id @default(uuid())
+  provider              String    @unique
+  accountEmail          String    @map("account_email")
+  encryptedRefreshToken String    @map("encrypted_refresh_token")
+  encryptedAccessToken  String?   @map("encrypted_access_token")
+  tokenExpiry           DateTime? @map("token_expiry")
+  scope                 String
+  status                String    @default("CONNECTED")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("oauth_connections")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  metadata   Json     @default("{}")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action, entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model AppConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_configs")
+}

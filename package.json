@@ -1,0 +1,32 @@
+{
+  "name": "wardell-lead-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-Assisted Business Lead Generation & Email Outreach Automation Platform",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev:backend": "npm --workspace=backend run dev",
+    "dev:frontend": "npm --workspace=frontend run dev",
+    "bot": "npm --workspace=@wardell/backend run bot --",
+    "bot:scrape": "npm --workspace=@wardell/backend run bot:scrape --",
+    "build:backend": "npm --workspace=backend run build",
+    "build:frontend": "npm --workspace=frontend run build",
+    "test:backend": "npm --workspace=backend run test",
+    "lint": "npm --workspace=backend run lint && npm --workspace=frontend run lint"
+  },
+  "keywords": [
+    "lead-generation",
+    "email-automation",
+    "bullmq",
+    "vue3",
+    "express",
+    "prisma",
+    "indonesia-b2b"
+  ],
+  "author": "Wardell Tech",
+  "license": "UNLICENSED"
+}
