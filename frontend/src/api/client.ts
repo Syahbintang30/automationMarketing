@@ -121,6 +121,34 @@ class ApiClient {
     return this.request<PaginatedResponse<LeadDTO>>(`/leads?${query.toString()}`);
   }
 
+  // Google Maps Scraping & Screening
+  async scrapeGmaps(query: string, limit = 20) {
+    return this.request<ApiResponse<any>>('/leads/scrape-gmaps', {
+      method: 'POST',
+      body: JSON.stringify({ query, limit }),
+    });
+  }
+
+  async updateScreening(id: string, data: { coldCallStatus?: string; coldCallNotes?: string }) {
+    return this.request<ApiResponse<LeadDTO>>(`/leads/${id}/screening`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteLead(id: string) {
+    return this.request<ApiResponse<any>>(`/leads/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async bulkDeleteLeads(ids: string[]) {
+    return this.request<ApiResponse<any>>('/leads/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+  }
+
   // Export Download Helper
   getExportUrl(format: 'xlsx' | 'csv' = 'xlsx', params: Record<string, string> = {}): string {
     const query = new URLSearchParams({ format, ...params });

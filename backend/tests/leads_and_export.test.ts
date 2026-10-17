@@ -90,7 +90,27 @@ describe('Phase 2: Campaigns, Leads & Excel Export', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('text/csv');
-    expect(res.text).toContain('Business Name');
+    expect(res.text).toContain('Nama Instansi / Perusahaan');
     expect(res.text).toContain('Maju Digital Nusantara');
+  });
+
+  it('PATCH /api/v1/leads/:id/screening should update cold call status and notes', async () => {
+    const leads = await request(app)
+      .get('/api/v1/leads')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    const targetLead = leads.body.data[0];
+    const res = await request(app)
+      .patch(`/api/v1/leads/${targetLead.id}/screening`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        coldCallStatus: 'TERTARIK',
+        coldCallNotes: 'Sudah bicara dengan bagian TU, follow up hari Rabu.',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.coldCallStatus).toBe('TERTARIK');
+    expect(res.body.data.coldCallNotes).toContain('bagian TU');
   });
 });

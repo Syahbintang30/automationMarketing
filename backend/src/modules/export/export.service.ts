@@ -70,21 +70,21 @@ export class ExportService {
     // Define columns
     sheet.columns = [
       { header: 'No', key: 'no', width: 6 },
-      { header: 'Business Name', key: 'businessName', width: 32 },
-      { header: 'Province', key: 'province', width: 18 },
-      { header: 'City / Regency', key: 'city', width: 22 },
-      { header: 'Category', key: 'businessCategory', width: 28 },
-      { header: 'Website', key: 'websiteUrl', width: 30 },
-      { header: 'Business Email', key: 'contactEmail', width: 28 },
-      { header: 'Email Status', key: 'emailVerificationStatus', width: 16 },
-      { header: 'Address', key: 'businessAddress', width: 35 },
-      { header: 'Data Source', key: 'dataSource', width: 20 },
-      { header: 'Source Provenance URL', key: 'emailSourceUrl', width: 35 },
-      { header: 'Campaign(s)', key: 'campaigns', width: 26 },
-      { header: 'Qualification Status', key: 'qualificationStatus', width: 20 },
-      { header: 'Outreach Status', key: 'outreachStatus', width: 18 },
-      { header: 'Last Contacted At', key: 'lastContactedAt', width: 20 },
-      { header: 'Discovered Date', key: 'createdAt', width: 16 },
+      { header: 'Nama Instansi / Perusahaan', key: 'businessName', width: 34 },
+      { header: '📞 Nomor Telepon', key: 'phone', width: 22 },
+      { header: 'Status Cold Call', key: 'coldCallStatus', width: 20 },
+      { header: 'Catatan Cold Call', key: 'coldCallNotes', width: 35 },
+      { header: 'Kategori', key: 'businessCategory', width: 25 },
+      { header: 'Kota / Kab', key: 'city', width: 20 },
+      { header: 'Provinsi', key: 'province', width: 18 },
+      { header: 'Alamat Lengkap', key: 'businessAddress', width: 40 },
+      { header: 'Website', key: 'websiteUrl', width: 28 },
+      { header: 'Email', key: 'contactEmail', width: 25 },
+      { header: 'Rating ⭐', key: 'rating', width: 12 },
+      { header: 'Total Ulasan', key: 'reviewCount', width: 14 },
+      { header: 'Link Google Maps', key: 'mapsUrl', width: 35 },
+      { header: 'Sumber Data', key: 'dataSource', width: 18 },
+      { header: 'Tanggal Ditarik', key: 'createdAt', width: 16 },
     ];
 
     // Style the header row
@@ -95,7 +95,7 @@ export class ExportService {
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FF1E293B' }, // Dark slate
+        fgColor: { argb: 'FF0F172A' }, // Deep slate
       };
       cell.font = {
         color: { argb: 'FFFFFFFF' },
@@ -110,28 +110,26 @@ export class ExportService {
 
     // Populate rows with sanitized values
     leads.forEach((lead, index) => {
-      const campaignNames = lead.leadCampaigns.map((lc) => lc.campaign.name).join(', ') || '-';
-
       const row = sheet.addRow({
         no: index + 1,
         businessName: this.sanitizeCellValue(lead.businessName),
-        province: this.sanitizeCellValue(lead.province),
-        city: this.sanitizeCellValue(lead.city),
+        phone: this.sanitizeCellValue(lead.phone || '-'),
+        coldCallStatus: this.sanitizeCellValue(lead.coldCallStatus || 'BELUM_DIHUBUNGI'),
+        coldCallNotes: this.sanitizeCellValue(lead.coldCallNotes || '-'),
         businessCategory: this.sanitizeCellValue(lead.businessCategory),
+        city: this.sanitizeCellValue(lead.city),
+        province: this.sanitizeCellValue(lead.province),
+        businessAddress: this.sanitizeCellValue(lead.businessAddress || '-'),
         websiteUrl: this.sanitizeCellValue(lead.websiteUrl || '-'),
         contactEmail: this.sanitizeCellValue(lead.contactEmail || '-'),
-        emailVerificationStatus: this.sanitizeCellValue(lead.emailVerificationStatus),
-        businessAddress: this.sanitizeCellValue(lead.businessAddress || '-'),
+        rating: lead.rating ? lead.rating.toFixed(1) : '-',
+        reviewCount: lead.reviewCount ? lead.reviewCount : '-',
+        mapsUrl: this.sanitizeCellValue(lead.mapsUrl || '-'),
         dataSource: this.sanitizeCellValue(lead.dataSource),
-        emailSourceUrl: this.sanitizeCellValue(lead.emailSourceUrl || '-'),
-        campaigns: this.sanitizeCellValue(campaignNames),
-        qualificationStatus: this.sanitizeCellValue(lead.qualificationStatus),
-        outreachStatus: this.sanitizeCellValue(lead.outreachStatus),
-        lastContactedAt: lead.lastContactedAt ? lead.lastContactedAt.toISOString().split('T')[0] : '-',
         createdAt: lead.createdAt.toISOString().split('T')[0],
       });
 
-      row.height = 20;
+      row.height = 22;
       row.alignment = { vertical: 'middle' };
     });
 

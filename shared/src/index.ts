@@ -76,6 +76,12 @@ export interface LeadDTO {
   emailVerificationStatus: EmailVerificationStatus;
   dataSource: string;
   sourceRecordId?: string | null;
+  phone?: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  mapsUrl?: string | null;
+  coldCallStatus: string;
+  coldCallNotes?: string | null;
   qualificationStatus: QualificationStatus;
   outreachStatus: OutreachStatus;
   lastContactedAt?: string | null;

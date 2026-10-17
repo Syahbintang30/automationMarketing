@@ -14,6 +14,7 @@ export interface LeadFilterParams {
   businessCategory?: string;
   outreachStatus?: OutreachStatus;
   qualificationStatus?: QualificationStatus;
+  coldCallStatus?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -72,6 +73,9 @@ export class LeadsService {
     if (params.qualificationStatus) {
       where.qualificationStatus = params.qualificationStatus;
     }
+    if (params.coldCallStatus) {
+      where.coldCallStatus = params.coldCallStatus;
+    }
     if (params.campaignId) {
       where.leadCampaigns = {
         some: { campaignId: params.campaignId },
@@ -80,9 +84,11 @@ export class LeadsService {
     if (params.search) {
       where.OR = [
         { businessName: { contains: params.search, mode: 'insensitive' } },
+        { phone: { contains: params.search, mode: 'insensitive' } },
         { contactEmail: { contains: params.search, mode: 'insensitive' } },
         { websiteUrl: { contains: params.search, mode: 'insensitive' } },
         { city: { contains: params.search, mode: 'insensitive' } },
+        { businessCategory: { contains: params.search, mode: 'insensitive' } },
       ];
     }
 
@@ -242,6 +248,42 @@ export class LeadsService {
       }
     }
     return results;
+  }
+
+  /**
+   * Update lead screening / cold call data
+   */
+  static async updateScreening(
+    id: string,
+    data: { coldCallStatus?: string; coldCallNotes?: string }
+  ) {
+    await this.getLeadById(id);
+    return prisma.lead.update({
+      where: { id },
+      data: {
+        ...(data.coldCallStatus ? { coldCallStatus: data.coldCallStatus } : {}),
+        ...(data.coldCallNotes !== undefined ? { coldCallNotes: data.coldCallNotes } : {}),
+      },
+    });
+  }
+
+  /**
+   * Delete a single lead (screening removal)
+   */
+  static async deleteLead(id: string) {
+    await this.getLeadById(id);
+    return prisma.lead.delete({
+      where: { id },
+    });
+  }
+
+  /**
+   * Bulk delete leads (discard during screening)
+   */
+  static async bulkDeleteLeads(ids: string[]) {
+    return prisma.lead.deleteMany({
+      where: { id: { in: ids } },
+    });
   }
 
   /**

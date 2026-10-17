@@ -1,63 +1,87 @@
 # Panduan Penggunaan Lengkap (User Guide)
-## Wardell Lead Engine — AI Lead Generation & Outreach Automation
+## Google Maps Scraper, Screening & Cold Call Hub
 
-Buku panduan ini dibuat khusus untuk memandu pengguna/operator dalam menjalankan dan menggunakan setiap fitur pada sistem **Wardell Lead Engine**, baik melalui **Bot Terminal (CLI)** maupun **Tampilan Web Dashboard**.
-
----
-
-## 📌 Daftar Isi
-1. [Langkah Awal: Menjalankan Aplikasi](#1-langkah-awal-menjalankan-aplikasi)
-2. [Fitur 1: Bot Scraper Otomatis ke Excel / CSV (Terminal)](#fitur-1-bot-scraper-otomatis-ke-excel--csv-terminal)
-3. [Fitur 2: Halaman Dashboard & Statistik](#fitur-2-halaman-dashboard--statistik)
-4. [Fitur 3: Manajemen Kampanye (Campaigns)](#fitur-3-manajemen-kampanye-campaigns)
-5. [Fitur 4: Manajemen Leads & Ekspor Spreadsheet](#fitur-4-manajemen-leads--ekspor-spreadsheet)
-6. [Fitur 5: Pembuatan Draf Email AI & Review Draf](#fitur-5-pembuatan-draf-email-ai--review-draf)
-7. [Fitur 6: Antrean Pengiriman (Sending Queue) & Kontrol Pause](#fitur-6-antrean-pengiriman-sending-queue--kontrol-pause)
-8. [Fitur 7: Daftar Blokir & Opt-Out (Suppression List)](#fitur-7-daftar-blokir--opt-out-suppression-list)
-9. [Fitur 8: Pengaturan Integrasi & Akun Gmail](#fitur-8-pengaturan-integrasi--akun-gmail)
-10. [FAQ & Solusi Kendala Umum](#10-faq--solusi-kendala-umum)
+Panduan praktis untuk operator/pengguna dalam melakukan **scraping data instansi pemerintah dan perusahaan dari Google Maps**, melakukan **screening cold call** langsung di web, dan melakukan **export ke file Excel (.xlsx)** siap pakai.
 
 ---
 
-## 1. Langkah Awal: Menjalankan Aplikasi
+## 📌 Alur Kerja Cepat (Workflow)
 
-Aplikasi memiliki dua mode penggunaan:
-* **Mode Bot Terminal:** Cocok jika Anda hanya butuh data mentah ke Excel/CSV secepat mungkin.
-* **Mode Web Dashboard:** Cocok untuk mengatur kampanye, melihat statistik visual, mengedit draf email AI, dan memantau status pengiriman.
-
-### Membuka Web Dashboard:
-1. Buka terminal di folder project:
-   ```bash
-   # Terminal 1 - Menjalankan Backend API:
-   npm run dev:backend
-   ```
-2. Buka tab terminal baru:
-   ```bash
-   # Terminal 2 - Menjalankan Tampilan Web:
-   npm run dev:frontend
-   ```
-3. Buka browser ke alamat: **`http://localhost:5173`**
-4. **Akun Login Bawaan:**
-   * **Email:** `admin@wardell.tech`
-   * **Password:** `WardellAdmin2026!`
-
----
-
-## Fitur 1: Bot Scraper Otomatis ke Excel / CSV (Terminal)
-
-Fitur ini memungkinkan Anda melakukan scraping data bisnis dan kontak resmi langsung dari terminal tanpa perlu membuka browser.
-
-### Cara Menjalankan:
-Cukup ketik perintah di terminal:
-```bash
-npm run bot
+```
+[1. Ketik Keyword di GMaps Scraper]  -->  [2. Scraper Menarik Data Real]
+                                                      │
+[4. Export ke Excel (.xlsx)]         <--  [3. Screening & Catat Hasil Cold Call]
 ```
 
-### Mengatur Target Daerah dan Kategori Sendiri:
-Tambahkan parameter sesuai target pencarian Anda:
+---
 
+## 🚀 Cara 1: Menggunakan Web Dashboard (Rekomendasi)
+
+Tampilan visual memudahkan Anda melihat nomor telepon, klik untuk langsung telepon, memberikan status screening, menulis catatan hasil pembicaraan, dan export ke Excel.
+
+### 1. Buka Aplikasi di Browser:
+Pastikan server berjalan, lalu buka:
+👉 **`http://localhost:5173`**
+
+Pilih menu **🗺️ GMaps & Cold Call** di bilah navigasi sebelah kiri.
+
+### 2. Tarik Data Baru dari Google Maps:
+1. Di kotak pencarian **"Tarik Data Baru dari Google Maps"**, ketik target Anda:
+   * Contoh Instansi Pemerintah: `"dinas perhubungan bandung"`, `"dinas kesehatan jawa barat"`, `"kantor walikota surabaya"`
+   * Contoh Perusahaan / Bisnis: `"pt kontraktor jakarta"`, `"pabrik manufaktur cikarang"`, `"perusahaan logistik semarang"`
+2. Pilih **Jumlah Target** (10, 20, 30, atau 50 data).
+3. Klik tombol **"🚀 Mulai Scraping"**.
+4. Sistem membuka browser Google Chrome di background, mengambil data real (Nama, Nomor Telepon, Alamat, Kategori, Rating, Link Maps), dan otomatis menyimpannya ke database.
+
+### 3. Screening Data & Cold Calling Langsung di Tabel:
+* **📞 Panggilan Telepon Cepat:** Klik nomor telepon (berwarna biru muda) untuk langsung melakukan panggilan via softphone/ponsel Anda. Ada tombol salin 📋 untuk copy-paste nomor dengan cepat.
+* **📋 Update Status Cold Call:** Klik dropdown status per baris:
+  * ⏳ *Belum Dihubungi* (Status awal)
+  * 🎯 *Tertarik / Prospek* (Target potensial)
+  * 📞 *Follow Up* (Minta dihubungi lagi)
+  * 📵 *Tidak Diangkat / Sibuk*
+  * ❌ *Nomor Salah / Tutup*
+  * 🚫 *Bukan Target* (Untuk disaring)
+* **📝 Tulis Catatan Cold Call:** Ketik langsung di kolom catatan (contoh: *"Bicara dengan Pak Hendra bagian Pengadaan, minta proposal dikirim hari Senin"*). Cukup tekan `Enter` atau klik di luar kotak, catatan tersimpan otomatis.
+* **🗑️ Buang yang Bukan Target:** Centang data yang tidak relevan, lalu klik tombol merah **"🗑️ Hapus yang Dipilih (Screening)"**.
+
+### 4. Export ke Excel (.xlsx) Siap Pakai:
+1. Klik tombol hijau **"📊 Export Excel (.xlsx)"** di pojok kanan atas.
+2. File Excel langsung terunduh rapi dengan kolom:
+   * `No`
+   * `Nama Instansi / Perusahaan`
+   * `📞 Nomor Telepon`
+   * `Status Cold Call`
+   * `Catatan Cold Call`
+   * `Kategori`
+   * `Kota / Kab & Provinsi`
+   * `Alamat Lengkap`
+   * `Website`
+   * `Rating & Ulasan`
+   * `Link Google Maps`
+
+---
+
+## 💻 Cara 2: Menggunakan Terminal / Command Line (Bot CLI)
+
+Bagi yang ingin scraping super cepat langsung menghasilkan file Excel tanpa buka browser:
+
+Cukup jalankan di terminal:
 ```bash
-npm run bot -- --province="[Nama Provinsi]" --city="[Nama Kota]" --category="[Jenis Bisnis]" --limit=[Jumlah Data] --format=[xlsx atau csv]
+# Contoh 1: Tarik dinas kesehatan bandung
+npm run bot -- "dinas kesehatan bandung" --limit=20
+
+# Contoh 2: Tarik pabrik manufaktur cikarang
+npm run bot -- "pabrik manufaktur cikarang" --limit=30
+
+# Contoh 3: Output format CSV
+npm run bot -- "pt kontraktor jakarta" --csv
+```
+
+File Excel hasil scraping langsung tersimpan otomatis di folder:
+📂 `backend/exports/gmaps_[nama_pencarian]_[tanggal].xlsx`
+
+---
 ```
 
 #### Contoh-Contoh Perintah Siap Pakai:

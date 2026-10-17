@@ -39,3 +39,8 @@ coverage/
 # Temporary export files
 tmp/
 scratch/
+exports/
+backend/exports/
+*.xlsx
+*.csv
+

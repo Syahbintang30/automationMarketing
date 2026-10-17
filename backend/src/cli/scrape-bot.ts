@@ -1,6 +1,4 @@
-import { PublicDirectoryProvider } from '../modules/discovery/public-directory.provider';
-import { EnrichmentService } from '../modules/enrichment/enrichment.service';
-import { LeadsService } from '../modules/leads/leads.service';
+import { GmapsScraperService } from '../modules/discovery/gmaps-scraper.service';
 import { ExportService } from '../modules/export/export.service';
 import { prisma } from '../db/prisma';
 import path from 'path';
@@ -9,123 +7,72 @@ import fs from 'fs';
 // Parse command-line flags
 function parseArgs() {
   const args = process.argv.slice(2);
-  const params: Record<string, string> = {
-    province: 'Jawa Barat',
-    city: 'Kota Bandung',
-    category: 'Software House',
-    limit: '25',
-    format: 'xlsx',
-  };
+  let query = 'dinas kesehatan bandung';
+  let limit = 20;
+  let format: 'xlsx' | 'csv' = 'xlsx';
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith('--')) {
-      const parts = arg.substring(2).split('=');
-      const key = parts[0];
-      const val = parts[1] || args[i + 1];
-      if (val && !val.startsWith('--')) {
-        params[key] = val;
-      }
+    if (arg.startsWith('--query=')) {
+      query = arg.split('=')[1];
+    } else if (arg === '--query' && args[i + 1]) {
+      query = args[i + 1];
+      i++;
+    } else if (arg.startsWith('--limit=')) {
+      limit = parseInt(arg.split('=')[1], 10);
+    } else if (arg === '--limit' && args[i + 1]) {
+      limit = parseInt(args[i + 1], 10);
+      i++;
+    } else if (arg === '--csv') {
+      format = 'csv';
+    } else if (!arg.startsWith('--') && i === 0) {
+      query = arg;
     }
   }
 
-  return {
-    province: params.province,
-    city: params.city,
-    category: params.category,
-    limit: parseInt(params.limit, 10) || 25,
-    format: params.format.toLowerCase() === 'csv' ? 'csv' : 'xlsx',
-    output: params.output,
-  };
+  return { query, limit, format };
 }
 
 async function runBot() {
   const opts = parseArgs();
 
   console.log('===============================================================');
-  console.log('🤖 WARDELL LEAD ENGINE — AUTOMATED B2B SCRAPER & ENRICHMENT BOT');
+  console.log('🤖 GOOGLE MAPS REAL SCRAPER BOT — FOR COLD CALLING');
   console.log('===============================================================');
-  console.log(`📍 Target Province : ${opts.province}`);
-  console.log(`🏙️  Target City     : ${opts.city}`);
-  console.log(`🏢 Category / Query : ${opts.category}`);
-  console.log(`🎯 Requested Limit  : ${opts.limit} leads`);
+  console.log(`🔍 Target Query     : "${opts.query}"`);
+  console.log(`🎯 Limit Target     : ${opts.limit} entri`);
   console.log(`📊 Output Format    : ${opts.format.toUpperCase()}`);
   console.log('---------------------------------------------------------------\n');
 
-  console.log('🔍 [Step 1/3] Searching Indonesian business directories & maps listings...');
-  const provider = new PublicDirectoryProvider();
-  const discovered = await provider.searchBusinesses({
-    province: opts.province,
-    city: opts.city,
-    businessCategory: opts.category,
-    maxResults: opts.limit,
+  console.log('🚀 [1/2] Membuka Google Maps & mengekstrak data...');
+  const scrapeResult = await GmapsScraperService.scrape(opts.query, opts.limit);
+
+  console.log(`\n✅ Selesai mengekstrak: ${scrapeResult.places.length} data ditemukan`);
+  console.log(`💾 Tersimpan di DB : ${scrapeResult.savedCount} data baru, ${scrapeResult.updatedCount} diupdate\n`);
+
+  console.log('📊 Ringkasan Data yang Ditemukan:');
+  scrapeResult.places.slice(0, 5).forEach((p, idx) => {
+    console.log(`   [${idx + 1}] ${p.businessName}`);
+    console.log(`       📞 Telp    : ${p.phone || '(Belum ada di kartu)'}`);
+    console.log(`       📍 Alamat  : ${p.businessAddress || p.city}`);
+    console.log(`       🏷️  Kategori: ${p.businessCategory}`);
   });
-
-  console.log(`✅ Discovered ${discovered.length} initial business candidates.\n`);
-  console.log('🌐 [Step 2/3] Enriching contacts from official websites (checking robots.txt)...');
-
-  let enrichedCount = 0;
-  const processedLeads = [];
-
-  for (let i = 0; i < discovered.length; i++) {
-    const biz = discovered[i];
-    console.log(`   [${i + 1}/${discovered.length}] Inspecting: "${biz.businessName}"`);
-
-    let contactEmail = biz.contactEmail;
-    let emailSourceUrl = biz.emailSourceUrl;
-    let verificationStatus = biz.contactEmail ? 'VERIFIED' : 'UNVERIFIED';
-
-    if (!contactEmail && biz.websiteUrl) {
-      console.log(`      Crawling website: ${biz.websiteUrl}...`);
-      const enriched = await EnrichmentService.enrichFromWebsite(biz.websiteUrl);
-      if (enriched.contactEmail) {
-        contactEmail = enriched.contactEmail;
-        emailSourceUrl = enriched.emailSourceUrl;
-        verificationStatus = enriched.verificationStatus;
-        console.log(`      ✨ Found verified email: ${contactEmail} (${enriched.emailSourceUrl})`);
-        enrichedCount++;
-      }
-      if (enriched.phone && !biz.phone) {
-        biz.phone = enriched.phone;
-        console.log(`      📞 Found telephone/WA: ${biz.phone}`);
-      }
-    }
-
-    // Save/Upsert into PostgreSQL database
-    const saved = await LeadsService.upsertLead({
-      businessName: biz.businessName,
-      businessCategory: biz.businessCategory,
-      province: biz.province,
-      city: biz.city,
-      businessAddress: biz.businessAddress,
-      websiteUrl: biz.websiteUrl,
-      contactEmail,
-      emailSourceUrl,
-      // @ts-expect-error verification enum match
-      emailVerificationStatus: verificationStatus,
-      dataSource: biz.dataSource,
-      sourceRecordId: biz.sourceRecordId,
-    });
-
-    processedLeads.push(saved);
+  if (scrapeResult.places.length > 5) {
+    console.log(`   ... dan ${scrapeResult.places.length - 5} data lainnya.\n`);
   }
 
-  console.log(`\n💾 Saved ${processedLeads.length} leads to PostgreSQL database (deduplicated).`);
-  console.log(`✨ Successfully enriched ${enrichedCount} contact emails.\n`);
-
-  console.log('📊 [Step 3/3] Generating spreadsheet export...');
+  console.log('\n📁 [2/2] Mengenerate file spreadsheet...');
   const exportDir = path.resolve(process.cwd(), 'exports');
   if (!fs.existsSync(exportDir)) {
     fs.mkdirSync(exportDir, { recursive: true });
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = opts.output || `leads_${opts.province.replace(/\s+/g, '_')}_${timestamp}.${opts.format}`;
-  const targetFilePath = path.isAbsolute(filename) ? filename : path.join(exportDir, filename);
+  const sanitizedQuery = opts.query.replace(/[^a-zA-Z0-9]/g, '_');
+  const filename = `gmaps_${sanitizedQuery}_${timestamp}.${opts.format}`;
+  const targetFilePath = path.join(exportDir, filename);
 
-  const workbook = await ExportService.generateLeadsWorkbook({
-    province: opts.province,
-  });
+  const workbook = await ExportService.generateLeadsWorkbook({});
 
   if (opts.format === 'csv') {
     await workbook.csv.writeFile(targetFilePath);
@@ -134,9 +81,9 @@ async function runBot() {
   }
 
   console.log('===============================================================');
-  console.log(`🎉 SCRAPING COMPLETE!`);
-  console.log(`📁 File exported to : ${targetFilePath}`);
-  console.log(`📈 Total Records    : ${processedLeads.length} leads`);
+  console.log(`🎉 SCRAPING SELESAI & FILE SIAP DIPAKAI COLD CALL!`);
+  console.log(`📁 File Excel tersimpan di : ${targetFilePath}`);
+  console.log(`📈 Total Leads             : ${scrapeResult.places.length}`);
   console.log('===============================================================');
 }
 

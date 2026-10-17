@@ -22,8 +22,8 @@
         </router-link>
 
         <router-link to="/leads" class="nav-item">
-          <span class="nav-icon">👥</span>
-          <span>Leads & Provenance</span>
+          <span class="nav-icon">🗺️</span>
+          <span>GMaps & Cold Call</span>
         </router-link>
 
         <router-link to="/email-review" class="nav-item">
