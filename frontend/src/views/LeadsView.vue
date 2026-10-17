@@ -26,12 +26,12 @@
           <h3>Tarik Data Baru per Provinsi</h3>
         </div>
         <div class="quick-presets">
-          <span class="text-xs text-dim">Contoh Cepat:</span>
-          <button class="preset-chip" @click="setPreset('Jawa Barat', 'Dinas Kesehatan')">📍 Jabar - Dinas Kesehatan</button>
-          <button class="preset-chip" @click="setPreset('DKI Jakarta', 'Rumah Sakit')">📍 Jakarta - Rumah Sakit</button>
-          <button class="preset-chip" @click="setPreset('Jawa Barat', 'Dinas Perhubungan', 'Bandung')">📍 Bandung - Dishub</button>
-          <button class="preset-chip" @click="setPreset('Jawa Timur', 'PT Manufaktur')">📍 Jatim - Manufaktur</button>
-          <button class="preset-chip" @click="setPreset('Banten', 'Pabrik Industri', 'Cilegon')">📍 Banten - Pabrik</button>
+          <span class="text-xs text-dim">Contoh Instansi / Bisnis:</span>
+          <button class="preset-chip" @click="setPreset('Jawa Barat', 'Kantor Dinas Pemerintah')">🏛️ Jabar - Kantor Dinas</button>
+          <button class="preset-chip" @click="setPreset('DKI Jakarta', 'Dinas Kesehatan')">🏥 Jakarta - Dinkes</button>
+          <button class="preset-chip" @click="setPreset('Jawa Barat', 'Dinas Pendidikan', 'Bandung')">🏫 Bandung - Disdik</button>
+          <button class="preset-chip" @click="setPreset('Jawa Timur', 'Rumah Sakit Umum', 'Surabaya')">🏥 Surabaya - RS</button>
+          <button class="preset-chip" @click="setPreset('Banten', 'Dinas Perhubungan', 'Serang')">🚦 Serang - Dishub</button>
         </div>
       </div>
 
@@ -55,7 +55,7 @@
             <input
               v-model="targetCategory"
               class="scrape-input"
-              placeholder="Contoh: Dinas Kesehatan, Dinas Pendidikan, PT Kontraktor, Rumah Sakit..."
+              placeholder="Contoh: Kantor Dinas Pemerintah, Dinas Kesehatan, Dinas Pendidikan, Rumah Sakit..."
               :disabled="isScraping"
             />
           </div>

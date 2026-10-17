@@ -108,16 +108,26 @@ export class GmapsScraperService {
       const cat = (input.category || input.query || '').trim();
       limit = input.limit || limitParam || 20;
 
-      if (cat && targetCity && targetProvince) {
-        finalQuery = `${cat} ${targetCity} ${targetProvince}`;
-      } else if (cat && targetProvince) {
-        finalQuery = `${cat} di Provinsi ${targetProvince}`;
-      } else if (cat && targetCity) {
-        finalQuery = `${cat} ${targetCity}`;
-      } else if (cat) {
-        finalQuery = cat;
+      // Smart Query Mapping for Government & Institutions:
+      // Google Maps indexes official institutions under "kantor dinas pemerintah", "dinas [kategori]", or "kantor pemerintah"
+      let searchCategory = cat;
+      const lowerCat = cat.toLowerCase();
+      if (!lowerCat || lowerCat === 'instansi' || lowerCat === 'instansi pemerintah' || lowerCat === 'kantor instansi') {
+        searchCategory = 'kantor dinas pemerintah';
+      } else if (lowerCat === 'pemda' || lowerCat === 'pemerintah daerah' || lowerCat === 'pemerintah') {
+        searchCategory = 'kantor dinas pemerintah daerah';
+      }
+
+      if (searchCategory && targetCity && targetProvince) {
+        finalQuery = `${searchCategory} ${targetCity} ${targetProvince}`;
+      } else if (searchCategory && targetProvince) {
+        finalQuery = `${searchCategory} di ${targetProvince}`;
+      } else if (searchCategory && targetCity) {
+        finalQuery = `${searchCategory} ${targetCity}`;
+      } else if (searchCategory) {
+        finalQuery = searchCategory;
       } else if (targetProvince) {
-        finalQuery = `kantor instansi dan perusahaan di ${targetProvince}`;
+        finalQuery = `kantor dinas pemerintah di ${targetProvince}`;
       } else {
         finalQuery = 'kantor dinas pemerintah';
       }
@@ -207,7 +217,13 @@ export class GmapsScraperService {
                 }
               }
 
-              return { rawName, mapsUrl, cardRating, cardReviewCount };
+              // Extract real category from card subtitle e.g. "Dewan pendidikan ·  · Jl. A. Yani"
+              const w4divs = Array.from(parent?.querySelectorAll('div.W4Efsd') || []);
+              const catDiv = w4divs.find((d) => d.textContent?.includes('·'));
+              const catText = catDiv?.textContent || '';
+              const cardCategory = catText ? catText.split('·')[0].trim() : null;
+
+              return { rawName, mapsUrl, cardRating, cardReviewCount, cardCategory };
             });
 
             if (!cardData.rawName || places.some((p) => p.businessName === cardData.rawName)) continue;
@@ -250,9 +266,9 @@ export class GmapsScraperService {
               );
               const website = webA ? (webA.getAttribute('href') || '').trim() : null;
 
-              // Category
-              const catBtn = document.querySelector('button[jsaction*="category"]');
-              const category = catBtn?.textContent?.trim() || 'Instansi / Bisnis';
+              // Category in detail pane
+              const catBtn = document.querySelector('button[jsaction*="category"], button[class*="DkEaL"]');
+              const category = catBtn?.textContent?.trim() || null;
 
               // Detailed Rating if not found on card
               const starEl = document.querySelector(
@@ -290,6 +306,7 @@ export class GmapsScraperService {
             const resolvedCity = targetCity || location.city;
             const resolvedRating = cardData.cardRating ?? detail.paneRating ?? null;
             const resolvedReviewCount = cardData.cardReviewCount ?? detail.paneReviewCount ?? null;
+            const resolvedCategory = cardData.cardCategory || detail.category || (cat || 'Kantor Pemerintah');
 
             places.push({
               businessName: resolvedName,
@@ -297,7 +314,7 @@ export class GmapsScraperService {
               rating: resolvedRating,
               reviewCount: resolvedReviewCount,
               businessAddress: detail.address,
-              businessCategory: detail.category || 'Instansi / Bisnis',
+              businessCategory: resolvedCategory,
               city: resolvedCity,
               province: resolvedProvince,
               websiteUrl: detail.website,
@@ -337,8 +354,13 @@ export class GmapsScraperService {
           );
           const website = webA ? (webA.getAttribute('href') || '').trim() : null;
 
-          const catBtn = document.querySelector('button[jsaction*="category"]');
-          const category = catBtn?.textContent?.trim() || 'Instansi / Bisnis';
+          const catBtn = document.querySelector('button[jsaction*="category"], button[class*="DkEaL"]');
+          let category = catBtn?.textContent?.trim();
+          if (!category) {
+            const h1 = document.querySelector('h1');
+            const subBtn = h1?.closest('div[role="main"]')?.querySelector('button[class*="fontTitleSmall"], div[class*="fontBodyMedium"] button');
+            category = subBtn?.textContent?.trim() || null;
+          }
 
           // Extract real star rating and review count from aria-label
           const starEl = document.querySelector('span.ZkP5Je, span[role="img"][aria-label*="bintang"], span[aria-label*="bintang"], span[aria-hidden="true"][class*="fontDisplayLarge"]');
@@ -371,6 +393,7 @@ export class GmapsScraperService {
           const location = this.inferLocation(singleDetail.address || '', finalQuery);
           const resolvedProvince = targetProvince || location.province;
           const resolvedCity = targetCity || location.city;
+          const resolvedCategory = singleDetail.category || (cat || 'Kantor Pemerintah');
 
           places.push({
             businessName: singleDetail.name,
@@ -378,7 +401,7 @@ export class GmapsScraperService {
             rating: singleDetail.rating,
             reviewCount: singleDetail.reviewCount,
             businessAddress: singleDetail.address,
-            businessCategory: singleDetail.category,
+            businessCategory: resolvedCategory,
             city: resolvedCity,
             province: resolvedProvince,
             websiteUrl: singleDetail.website,
