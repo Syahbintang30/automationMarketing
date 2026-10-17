@@ -15,6 +15,14 @@ export interface ScrapedPlace {
   mapsUrl: string;
 }
 
+export interface ScrapeGmapsInput {
+  query?: string;
+  province?: string;
+  city?: string;
+  category?: string;
+  limit?: number;
+}
+
 export class GmapsScraperService {
   /**
    * Resolve local Google Chrome binary path on macOS / Linux
@@ -80,11 +88,41 @@ export class GmapsScraperService {
 
   /**
    * Scrapes Google Maps live for companies, government institutions, or businesses
+   * Supports structured Province, City, and Category inputs
    */
   static async scrape(
-    query: string,
-    limit: number = 20
-  ): Promise<{ places: ScrapedPlace[]; savedCount: number; updatedCount: number }> {
+    input: string | ScrapeGmapsInput,
+    limitParam: number = 20
+  ): Promise<{ places: ScrapedPlace[]; savedCount: number; updatedCount: number; queryUsed: string; targetProvince?: string }> {
+    let finalQuery = '';
+    let targetProvince = '';
+    let targetCity = '';
+    let limit = limitParam;
+
+    if (typeof input === 'string') {
+      finalQuery = input.trim();
+      limit = limitParam;
+    } else {
+      targetProvince = input.province?.trim() || '';
+      targetCity = input.city?.trim() || '';
+      const cat = (input.category || input.query || '').trim();
+      limit = input.limit || limitParam || 20;
+
+      if (cat && targetCity && targetProvince) {
+        finalQuery = `${cat} ${targetCity} ${targetProvince}`;
+      } else if (cat && targetProvince) {
+        finalQuery = `${cat} di Provinsi ${targetProvince}`;
+      } else if (cat && targetCity) {
+        finalQuery = `${cat} ${targetCity}`;
+      } else if (cat) {
+        finalQuery = cat;
+      } else if (targetProvince) {
+        finalQuery = `kantor instansi dan perusahaan di ${targetProvince}`;
+      } else {
+        finalQuery = 'kantor dinas pemerintah';
+      }
+    }
+
     const executablePath = this.getChromeExecutablePath();
 
     const browser: Browser = await puppeteer.launch({
@@ -107,7 +145,7 @@ export class GmapsScraperService {
       await page.setViewport({ width: 1366, height: 900 });
 
       // Navigate to Google Maps search in Indonesian
-      const targetUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}?hl=id`;
+      const targetUrl = `https://www.google.com/maps/search/${encodeURIComponent(finalQuery)}?hl=id`;
       await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 35000 });
 
       // Check if we got a Feed list OR a Direct Place Page
@@ -190,8 +228,10 @@ export class GmapsScraperService {
               return { name, phone, address, website, category, rating, reviewCount };
             }, rawName);
 
-            const location = this.inferLocation(detail.address || '', query);
+            const location = this.inferLocation(detail.address || '', finalQuery);
             const resolvedName = (detail.name && detail.name !== 'Hasil') ? detail.name : rawName;
+            const resolvedProvince = targetProvince || location.province;
+            const resolvedCity = targetCity || location.city;
 
             places.push({
               businessName: resolvedName,
@@ -200,8 +240,8 @@ export class GmapsScraperService {
               reviewCount: detail.reviewCount,
               businessAddress: detail.address,
               businessCategory: detail.category || 'Instansi / Bisnis',
-              city: location.city,
-              province: location.province,
+              city: resolvedCity,
+              province: resolvedProvince,
               websiteUrl: detail.website,
               mapsUrl,
             });
@@ -252,7 +292,10 @@ export class GmapsScraperService {
         });
 
         if (singleDetail) {
-          const location = this.inferLocation(singleDetail.address || '', query);
+          const location = this.inferLocation(singleDetail.address || '', finalQuery);
+          const resolvedProvince = targetProvince || location.province;
+          const resolvedCity = targetCity || location.city;
+
           places.push({
             businessName: singleDetail.name,
             phone: singleDetail.phone,
@@ -260,8 +303,8 @@ export class GmapsScraperService {
             reviewCount: singleDetail.reviewCount,
             businessAddress: singleDetail.address,
             businessCategory: singleDetail.category,
-            city: location.city,
-            province: location.province,
+            city: resolvedCity,
+            province: resolvedProvince,
             websiteUrl: singleDetail.website,
             mapsUrl: page.url().split('?')[0],
           });
@@ -325,6 +368,6 @@ export class GmapsScraperService {
       }
     }
 
-    return { places, savedCount, updatedCount };
+    return { places, savedCount, updatedCount, queryUsed: finalQuery, targetProvince: targetProvince || undefined };
   }
 }

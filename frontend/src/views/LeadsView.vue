@@ -5,7 +5,7 @@
       <div>
         <h1 class="page-title">🗺️ Google Maps Scraper & Cold Call Hub</h1>
         <p class="page-subtitle">
-          Scraping data instansi pemerintah & perusahaan real-time dari Google Maps, screening data, dan export langsung ke Excel (.xlsx).
+          Scraping data instansi pemerintah & perusahaan real-time <strong>per provinsi</strong> dari Google Maps, screening data, dan export langsung ke Excel (.xlsx).
         </p>
       </div>
       <div class="header-actions">
@@ -13,50 +13,88 @@
           📄 Export CSV
         </button>
         <button class="btn btn-emerald" @click="exportData('xlsx')">
-          📊 Export Excel (.xlsx)
+          📊 Export Excel {{ filters.province ? '(' + filters.province + ')' : '(.xlsx)' }}
         </button>
       </div>
     </div>
 
-    <!-- Scraper Panel (Top Card) -->
+    <!-- Scraper Panel (Top Card) with Explicit Province Selection -->
     <div class="glass-panel scraper-panel">
       <div class="scraper-header">
         <div class="scraper-title">
           <span class="scraper-badge">LIVE GOOGLE MAPS</span>
-          <h3>Tarik Data Baru dari Google Maps</h3>
+          <h3>Tarik Data Baru per Provinsi</h3>
         </div>
         <div class="quick-presets">
           <span class="text-xs text-dim">Contoh Cepat:</span>
-          <button class="preset-chip" @click="setPreset('dinas perhubungan bandung')">Dinas Perhubungan Bandung</button>
-          <button class="preset-chip" @click="setPreset('dinas kesehatan jawa barat')">Dinas Kesehatan Jabar</button>
-          <button class="preset-chip" @click="setPreset('pt kontraktor jakarta')">PT Kontraktor Jakarta</button>
-          <button class="preset-chip" @click="setPreset('pabrik manufaktur cikarang')">Pabrik Cikarang</button>
+          <button class="preset-chip" @click="setPreset('Jawa Barat', 'Dinas Kesehatan')">📍 Jabar - Dinas Kesehatan</button>
+          <button class="preset-chip" @click="setPreset('DKI Jakarta', 'Rumah Sakit')">📍 Jakarta - Rumah Sakit</button>
+          <button class="preset-chip" @click="setPreset('Jawa Barat', 'Dinas Perhubungan', 'Bandung')">📍 Bandung - Dishub</button>
+          <button class="preset-chip" @click="setPreset('Jawa Timur', 'PT Manufaktur')">📍 Jatim - Manufaktur</button>
+          <button class="preset-chip" @click="setPreset('Banten', 'Pabrik Industri', 'Cilegon')">📍 Banten - Pabrik</button>
         </div>
       </div>
 
-      <form class="scraper-form" @submit.prevent="runGmapsScraper">
-        <div class="search-input-wrapper">
-          <span class="search-icon">🔍</span>
+      <form class="scraper-form-grid" @submit.prevent="runGmapsScraper">
+        <!-- 1. Dropdown Provinsi -->
+        <div class="form-group">
+          <label class="form-label">📍 PROVINSI TARGET</label>
+          <select v-model="targetProvince" class="form-select province-select" :disabled="isScraping">
+            <option value="">-- Pilih Provinsi --</option>
+            <option v-for="prov in INDONESIAN_PROVINCES" :key="prov" :value="prov">
+              {{ prov }}
+            </option>
+          </select>
+        </div>
+
+        <!-- 2. Kategori / Instansi / Bisnis -->
+        <div class="form-group flex-2">
+          <label class="form-label">🏢 KATEGORI / INSTANSI / PERUSAHAAN</label>
+          <div class="search-input-wrapper">
+            <span class="search-icon">🔍</span>
+            <input
+              v-model="targetCategory"
+              class="scrape-input"
+              placeholder="Contoh: Dinas Kesehatan, Dinas Pendidikan, PT Kontraktor, Rumah Sakit..."
+              :disabled="isScraping"
+            />
+          </div>
+        </div>
+
+        <!-- 3. Kota / Kabupaten (Opsional) -->
+        <div class="form-group">
+          <label class="form-label">🏙️ KOTA / KAB (OPSIONAL)</label>
           <input
-            v-model="scrapeQuery"
-            class="scrape-input"
-            placeholder="Ketik target instansi/perusahaan & kota (contoh: dinas pendidikan kota bandung, pt logistik surabaya)..."
+            v-model="targetCity"
+            class="form-input"
+            placeholder="Semua kota di provinsi ini"
             :disabled="isScraping"
           />
         </div>
-        <div class="limit-selector">
-          <label>Jumlah Target:</label>
-          <select v-model="scrapeLimit" class="form-select limit-select" :disabled="isScraping">
+
+        <!-- 4. Limit Selector -->
+        <div class="form-group limit-group">
+          <label class="form-label">🎯 JUMLAH DATA</label>
+          <select v-model="scrapeLimit" class="form-select" :disabled="isScraping">
             <option :value="10">10 Data</option>
             <option :value="20">20 Data</option>
             <option :value="30">30 Data</option>
             <option :value="50">50 Data</option>
           </select>
         </div>
-        <button type="submit" class="btn btn-primary scrape-submit-btn" :disabled="isScraping || !scrapeQuery.trim()">
-          <span v-if="isScraping" class="spinner-small"></span>
-          <span>{{ isScraping ? 'Sedang Scraping...' : '🚀 Mulai Scraping' }}</span>
-        </button>
+
+        <!-- Submit Button -->
+        <div class="form-group submit-group">
+          <label class="form-label">&nbsp;</label>
+          <button
+            type="submit"
+            class="btn btn-primary scrape-submit-btn"
+            :disabled="isScraping || (!targetCategory.trim() && !targetProvince)"
+          >
+            <span v-if="isScraping" class="spinner-small"></span>
+            <span>{{ isScraping ? 'Mengekstrak...' : '🚀 Mulai Scraping' }}</span>
+          </button>
+        </div>
       </form>
 
       <!-- Scrape Status Banner -->
@@ -71,23 +109,23 @@
 
     <!-- KPI / Screening Stat Chips -->
     <div class="stats-row">
-      <div class="stat-pill" @click="filters.coldCallStatus = ''">
+      <div class="stat-pill" @click="clearStatusFilter">
         <span class="pill-label">Total Data</span>
         <span class="pill-value font-mono">{{ pagination.total }}</span>
       </div>
-      <div class="stat-pill" @click="filters.coldCallStatus = 'BELUM_DIHUBUNGI'">
+      <div class="stat-pill" @click="setStatusFilter('BELUM_DIHUBUNGI')">
         <span class="pill-label">⏳ Belum Dihubungi</span>
         <span class="pill-value text-amber font-mono">{{ countByStatus('BELUM_DIHUBUNGI') }}</span>
       </div>
-      <div class="stat-pill" @click="filters.coldCallStatus = 'TERTARIK'">
+      <div class="stat-pill" @click="setStatusFilter('TERTARIK')">
         <span class="pill-label">🎯 Tertarik / Prospek</span>
         <span class="pill-value text-emerald font-mono">{{ countByStatus('TERTARIK') }}</span>
       </div>
-      <div class="stat-pill" @click="filters.coldCallStatus = 'FOLLOW_UP'">
+      <div class="stat-pill" @click="setStatusFilter('FOLLOW_UP')">
         <span class="pill-label">📞 Follow Up</span>
         <span class="pill-value text-cyan font-mono">{{ countByStatus('FOLLOW_UP') }}</span>
       </div>
-      <div class="stat-pill" @click="filters.coldCallStatus = 'TIDAK_DIANGKAT'">
+      <div class="stat-pill" @click="setStatusFilter('TIDAK_DIANGKAT')">
         <span class="pill-label">📵 Tidak Diangkat</span>
         <span class="pill-value text-dim font-mono">{{ countByStatus('TIDAK_DIANGKAT') }}</span>
       </div>
@@ -107,6 +145,26 @@
         </div>
 
         <div>
+          <label>Filter Provinsi</label>
+          <select v-model="filters.province" class="form-select" @change="fetchLeads">
+            <option value="">Semua Provinsi (Seluruh Indonesia)</option>
+            <option v-for="prov in INDONESIAN_PROVINCES" :key="'f-' + prov" :value="prov">
+              {{ prov }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label>Filter Kota / Wilayah</label>
+          <input
+            v-model="filters.city"
+            class="form-input"
+            placeholder="e.g. Bandung, Jakarta"
+            @change="fetchLeads"
+          />
+        </div>
+
+        <div>
           <label>Status Cold Call</label>
           <select v-model="filters.coldCallStatus" class="form-select" @change="fetchLeads">
             <option value="">Semua Status</option>
@@ -117,16 +175,6 @@
             <option value="NOMOR_SALAH">❌ Nomor Salah / Tutup</option>
             <option value="BUKAN_TARGET">🚫 Bukan Target</option>
           </select>
-        </div>
-
-        <div>
-          <label>Kota / Wilayah</label>
-          <input
-            v-model="filters.city"
-            class="form-input"
-            placeholder="e.g. Bandung, Jakarta"
-            @change="fetchLeads"
-          />
         </div>
       </div>
 
@@ -160,7 +208,7 @@
               <th>📞 Nomor Telepon (Cold Call)</th>
               <th>Status Cold Call</th>
               <th>Catatan Screening / Telepon</th>
-              <th>Kota & Kategori</th>
+              <th>Provinsi & Kota</th>
               <th>Rating ⭐</th>
               <th style="text-align: right;">Aksi</th>
             </tr>
@@ -183,6 +231,7 @@
                   📍 {{ lead.businessAddress }}
                 </div>
                 <div class="links-row">
+                  <span class="badge badge-category">{{ lead.businessCategory }}</span>
                   <a v-if="lead.mapsUrl" :href="lead.mapsUrl" target="_blank" class="mini-link text-cyan">
                     🗺️ Google Maps ↗
                   </a>
@@ -236,11 +285,10 @@
                 </div>
               </td>
 
-              <!-- Kota & Kategori -->
+              <!-- Provinsi & Kota -->
               <td>
-                <div class="text-white font-medium text-xs">{{ lead.city }}</div>
-                <div class="text-xs text-dim">{{ lead.province }}</div>
-                <span class="badge badge-category mt-1">{{ lead.businessCategory }}</span>
+                <div class="text-white font-semibold text-xs">{{ lead.province }}</div>
+                <div class="text-xs text-dim">{{ lead.city }}</div>
               </td>
 
               <!-- Rating & Reviews -->
@@ -270,7 +318,7 @@
                 <div class="empty-box">
                   <div class="empty-icon">🗺️</div>
                   <div class="empty-text">Belum ada data untuk filter saat ini.</div>
-                  <div class="empty-sub">Gunakan kolom pencarian di atas untuk menarik data dari Google Maps secara langsung.</div>
+                  <div class="empty-sub">Pilih Provinsi di panel atas dan klik "Mulai Scraping" untuk menarik data Google Maps.</div>
                 </div>
               </td>
             </tr>
@@ -307,14 +355,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { api } from '@/api/client';
+import { INDONESIAN_PROVINCES } from '@/constants/provinces';
 import type { LeadDTO } from '@wardell/shared';
 
 const leads = ref<LeadDTO[]>([]);
 const pagination = ref({ page: 1, limit: 20, total: 0, totalPages: 1 });
 const loading = ref(false);
 
-// Scraper state
-const scrapeQuery = ref('dinas perhubungan bandung');
+// Scraper state with Province & Category focus
+const targetProvince = ref('Jawa Barat');
+const targetCategory = ref('Dinas Kesehatan');
+const targetCity = ref('');
 const scrapeLimit = ref(20);
 const isScraping = ref(false);
 const scrapeMessage = ref('');
@@ -326,6 +377,7 @@ const selectedIds = ref<string[]>([]);
 // Filter state
 const filters = ref({
   search: '',
+  province: '',
   city: '',
   coldCallStatus: '',
 });
@@ -346,8 +398,20 @@ const countByStatus = (status: string) => {
   return leads.value.filter((l) => (l.coldCallStatus || 'BELUM_DIHUBUNGI') === status).length;
 };
 
-const setPreset = (preset: string) => {
-  scrapeQuery.value = preset;
+const setPreset = (prov: string, cat: string, city: string = '') => {
+  targetProvince.value = prov;
+  targetCategory.value = cat;
+  targetCity.value = city;
+};
+
+const clearStatusFilter = () => {
+  filters.value.coldCallStatus = '';
+  fetchLeads();
+};
+
+const setStatusFilter = (status: string) => {
+  filters.value.coldCallStatus = status;
+  fetchLeads();
 };
 
 let debounceTimer: any = null;
@@ -366,6 +430,7 @@ const fetchLeads = async () => {
       page: pagination.value.page,
       limit: pagination.value.limit,
       search: filters.value.search || undefined,
+      province: filters.value.province || undefined,
       city: filters.value.city || undefined,
       coldCallStatus: filters.value.coldCallStatus || undefined,
     });
@@ -385,15 +450,26 @@ const changePage = (newPage: number) => {
 };
 
 const runGmapsScraper = async () => {
-  if (!scrapeQuery.value.trim() || isScraping.value) return;
+  if (isScraping.value) return;
 
   isScraping.value = true;
   scrapeMessage.value = '';
 
   try {
-    const res = await api.scrapeGmaps(scrapeQuery.value.trim(), scrapeLimit.value);
+    const res = await api.scrapeGmaps({
+      province: targetProvince.value || undefined,
+      category: targetCategory.value || undefined,
+      city: targetCity.value || undefined,
+      limit: scrapeLimit.value,
+    });
+
     scrapeSuccess.value = true;
     scrapeMessage.value = res.message || `Berhasil menarik ${res.data?.length || 0} data dari Google Maps!`;
+    
+    // Automatically filter to this province to inspect new results
+    if (targetProvince.value) {
+      filters.value.province = targetProvince.value;
+    }
     await fetchLeads();
   } catch (err: any) {
     scrapeSuccess.value = false;
@@ -455,6 +531,7 @@ const copyPhone = (phone: string) => {
 const exportData = async (format: 'xlsx' | 'csv') => {
   await api.downloadExport(format, {
     search: filters.value.search,
+    province: filters.value.province,
     city: filters.value.city,
     coldCallStatus: filters.value.coldCallStatus,
   });
@@ -502,7 +579,7 @@ onMounted(fetchLeads);
 .scraper-panel {
   padding: 20px 24px;
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.25);
   margin-bottom: 20px;
 }
 .scraper-header {
@@ -554,58 +631,66 @@ onMounted(fetchLeads);
   color: #fff;
   border-color: var(--accent-cyan);
 }
-.scraper-form {
-  display: flex;
+
+/* Form Grid */
+.scraper-form-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 2fr 1.3fr 1fr 1.3fr;
   gap: 14px;
-  align-items: center;
+  align-items: flex-end;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.flex-2 {
+  flex: 2;
+}
+.form-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+.province-select {
+  font-weight: 600;
+  color: #38bdf8;
 }
 .search-input-wrapper {
   position: relative;
-  flex: 1;
 }
 .search-icon {
   position: absolute;
-  left: 14px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 16px;
+  font-size: 15px;
 }
 .scrape-input {
   width: 100%;
   background: rgba(15, 23, 42, 0.8);
   border: 1px solid var(--border-card);
-  padding: 12px 16px 12px 42px;
+  padding: 10px 14px 10px 38px;
   border-radius: var(--radius-md);
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
   transition: var(--transition);
 }
 .scrape-input:focus {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 12px rgba(14, 165, 233, 0.25);
-}
-.limit-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.limit-selector label {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.limit-select {
-  width: 110px;
-  padding: 10px 12px;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
 }
 .scrape-submit-btn {
-  padding: 12px 20px;
-  font-size: 14px;
-  white-space: nowrap;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  height: 42px;
 }
 .spinner-small {
   width: 14px;
@@ -692,7 +777,7 @@ onMounted(fetchLeads);
 }
 .filter-controls {
   display: grid;
-  grid-template-columns: 2fr 1.2fr 1fr;
+  grid-template-columns: 2fr 1.5fr 1.2fr 1.2fr;
   gap: 16px;
 }
 .filter-controls label {
@@ -745,7 +830,8 @@ onMounted(fetchLeads);
 }
 .links-row {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   margin-top: 4px;
 }
 .mini-link {
@@ -910,7 +996,6 @@ onMounted(fetchLeads);
 .text-emerald { color: var(--accent-emerald); }
 .text-amber { color: var(--accent-amber); }
 .font-bold { font-weight: 700; }
-.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
 .font-mono { font-family: 'JetBrains Mono', monospace; }
-.mt-1 { margin-top: 4px; }
 </style>

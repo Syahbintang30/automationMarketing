@@ -63,16 +63,25 @@ leadsRouter.get('/', authenticate, async (req: Request, res: Response, next: Nex
 // POST /api/v1/leads/scrape-gmaps
 leadsRouter.post('/scrape-gmaps', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { query, limit } = req.body;
-    if (!query || typeof query !== 'string' || query.trim().length < 3) {
+    const { query, province, city, category, limit } = req.body;
+    if (!query && !category && !province) {
       return res.status(400).json({
         success: false,
-        message: 'Query pencarian Google Maps minimal 3 karakter (contoh: "dinas perhubungan bandung")',
+        message: 'Harap masukkan kata kunci pencarian atau pilih provinsi & kategori',
       });
     }
 
     const { GmapsScraperService } = await import('../discovery/gmaps-scraper.service');
-    const result = await GmapsScraperService.scrape(query.trim(), limit ? parseInt(limit, 10) : 20);
+    const result = await GmapsScraperService.scrape(
+      {
+        query: typeof query === 'string' ? query.trim() : undefined,
+        province: typeof province === 'string' ? province.trim() : undefined,
+        city: typeof city === 'string' ? city.trim() : undefined,
+        category: typeof category === 'string' ? category.trim() : undefined,
+        limit: limit ? parseInt(limit, 10) : 20,
+      },
+      limit ? parseInt(limit, 10) : 20
+    );
 
     return res.status(200).json({
       success: true,
@@ -82,6 +91,8 @@ leadsRouter.post('/scrape-gmaps', authenticate, async (req: Request, res: Respon
         totalFound: result.places.length,
         savedCount: result.savedCount,
         updatedCount: result.updatedCount,
+        queryUsed: result.queryUsed,
+        targetProvince: result.targetProvince,
       },
     });
   } catch (err) {

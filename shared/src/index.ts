@@ -47,6 +47,49 @@ export interface CampaignDTO {
   };
 }
 
+export const INDONESIAN_PROVINCES = [
+  'Jawa Barat',
+  'DKI Jakarta',
+  'Jawa Timur',
+  'Jawa Tengah',
+  'Banten',
+  'DI Yogyakarta',
+  'Bali',
+  'Sumatera Utara',
+  'Sumatera Barat',
+  'Riau',
+  'Kepulauan Riau',
+  'Sumatera Selatan',
+  'Lampung',
+  'Jambi',
+  'Bengkulu',
+  'Bangka Belitung',
+  'Aceh',
+  'Kalimantan Barat',
+  'Kalimantan Selatan',
+  'Kalimantan Timur',
+  'Kalimantan Tengah',
+  'Kalimantan Utara',
+  'Sulawesi Selatan',
+  'Sulawesi Utara',
+  'Sulawesi Tengah',
+  'Sulawesi Tenggara',
+  'Sulawesi Barat',
+  'Gorontalo',
+  'Nusa Tenggara Barat',
+  'Nusa Tenggara Timur',
+  'Maluku',
+  'Maluku Utara',
+  'Papua',
+  'Papua Barat',
+  'Papua Selatan',
+  'Papua Tengah',
+  'Papua Pegunungan',
+  'Papua Barat Daya',
+] as const;
+
+export type IndonesianProvince = typeof INDONESIAN_PROVINCES[number];
+
 // Lead Types
 export type EmailVerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'UNAVAILABLE' | 'INVALID';
 export type QualificationStatus = 'UNQUALIFIED' | 'QUALIFIED' | 'NEEDS_WEBSITE' | 'DISQUALIFIED';

@@ -122,10 +122,14 @@ class ApiClient {
   }
 
   // Google Maps Scraping & Screening
-  async scrapeGmaps(query: string, limit = 20) {
+  async scrapeGmaps(
+    payload: string | { province?: string; city?: string; category?: string; query?: string; limit?: number },
+    limit = 20
+  ) {
+    const body = typeof payload === 'string' ? { query: payload, limit } : payload;
     return this.request<ApiResponse<any>>('/leads/scrape-gmaps', {
       method: 'POST',
-      body: JSON.stringify({ query, limit }),
+      body: JSON.stringify(body),
     });
   }
 
