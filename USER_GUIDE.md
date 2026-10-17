@@ -82,7 +82,6 @@ File Excel hasil scraping langsung tersimpan otomatis di folder:
 📂 `backend/exports/gmaps_[nama_pencarian]_[tanggal].xlsx`
 
 ---
-```
 
 #### Contoh-Contoh Perintah Siap Pakai:
 * **Mencari Hotel & Resto di Bandung format Excel:**
