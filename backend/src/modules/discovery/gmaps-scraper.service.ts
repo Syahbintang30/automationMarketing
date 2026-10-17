@@ -79,40 +79,173 @@ export class GmapsScraperService {
   }
 
   /**
-   * Infer city and province from Indonesian text or query
+   * Geolocation coordinates for Indonesian provinces to center Google Maps search
    */
-  private static inferLocation(text: string, query: string): { city: string; province: string } {
-    const combined = `${text} ${query}`.toLowerCase();
+  static readonly PROVINCE_COORDINATES: Record<string, { lat: number; lng: number; zoom: number }> = {
+    'Jawa Barat': { lat: -6.9175, lng: 107.6191, zoom: 10 },
+    'DKI Jakarta': { lat: -6.2088, lng: 106.8456, zoom: 11 },
+    'Jawa Timur': { lat: -7.2575, lng: 112.7521, zoom: 10 },
+    'Jawa Tengah': { lat: -6.9667, lng: 110.4167, zoom: 10 },
+    'Banten': { lat: -6.1153, lng: 106.1503, zoom: 10 },
+    'DI Yogyakarta': { lat: -7.7956, lng: 110.3695, zoom: 11 },
+    'Bali': { lat: -8.6705, lng: 115.2126, zoom: 11 },
+    'Sumatera Utara': { lat: 3.5952, lng: 98.6722, zoom: 10 },
+    'Sumatera Barat': { lat: -0.9471, lng: 100.4172, zoom: 10 },
+    'Riau': { lat: 0.5071, lng: 101.4478, zoom: 10 },
+    'Kepulauan Riau': { lat: 1.0828, lng: 104.0305, zoom: 10 },
+    'Sumatera Selatan': { lat: -2.9761, lng: 104.7754, zoom: 10 },
+    'Lampung': { lat: -5.4500, lng: 105.2667, zoom: 10 },
+    'Jambi': { lat: -1.6101, lng: 103.6131, zoom: 10 },
+    'Bengkulu': { lat: -3.8004, lng: 102.2655, zoom: 10 },
+    'Bangka Belitung': { lat: -2.1316, lng: 106.1169, zoom: 10 },
+    'Aceh': { lat: 5.5483, lng: 95.3238, zoom: 10 },
+    'Kalimantan Barat': { lat: -0.0263, lng: 109.3425, zoom: 10 },
+    'Kalimantan Selatan': { lat: -3.3194, lng: 114.5908, zoom: 10 },
+    'Kalimantan Timur': { lat: -0.5022, lng: 117.1536, zoom: 10 },
+    'Kalimantan Tengah': { lat: -2.2161, lng: 113.9139, zoom: 10 },
+    'Kalimantan Utara': { lat: 2.8441, lng: 117.3647, zoom: 10 },
+    'Sulawesi Selatan': { lat: -5.1477, lng: 119.4327, zoom: 10 },
+    'Sulawesi Utara': { lat: 1.4748, lng: 124.8421, zoom: 10 },
+    'Sulawesi Tengah': { lat: -0.8917, lng: 119.8707, zoom: 10 },
+    'Sulawesi Tenggara': { lat: -3.9985, lng: 122.5126, zoom: 10 },
+    'Sulawesi Barat': { lat: -2.6775, lng: 118.8895, zoom: 10 },
+    'Gorontalo': { lat: 0.5435, lng: 123.0568, zoom: 10 },
+    'Nusa Tenggara Barat': { lat: -8.5833, lng: 116.1167, zoom: 10 },
+    'Nusa Tenggara Timur': { lat: -10.1772, lng: 123.6070, zoom: 10 },
+    'Maluku': { lat: -3.6954, lng: 128.1814, zoom: 10 },
+    'Maluku Utara': { lat: 0.7893, lng: 127.3610, zoom: 10 },
+    'Papua': { lat: -2.5489, lng: 140.7197, zoom: 10 },
+    'Papua Barat': { lat: -0.8615, lng: 134.0620, zoom: 10 },
+    'Papua Selatan': { lat: -8.4991, lng: 140.4010, zoom: 10 },
+    'Papua Tengah': { lat: -3.3667, lng: 135.5000, zoom: 10 },
+    'Papua Pegunungan': { lat: -4.0833, lng: 138.9333, zoom: 10 },
+    'Papua Barat Daya': { lat: -0.8762, lng: 131.2558, zoom: 10 },
+  };
 
-    const indonesianLocations = [
-      { city: 'Kota Bandung', prov: 'Jawa Barat', kw: ['bandung', 'gedebage', 'soekarno hatta', 'jabar'] },
-      { city: 'Kota Cimahi', prov: 'Jawa Barat', kw: ['cimahi'] },
-      { city: 'Kabupaten Bekasi', prov: 'Jawa Barat', kw: ['cikarang', 'bekasi'] },
-      { city: 'Kabupaten Karawang', prov: 'Jawa Barat', kw: ['karawang'] },
-      { city: 'Kota Bogor', prov: 'Jawa Barat', kw: ['bogor'] },
-      { city: 'Kota Depok', prov: 'Jawa Barat', kw: ['depok'] },
-      { city: 'Kota Jakarta Selatan', prov: 'DKI Jakarta', kw: ['jakarta selatan', 'jaksel'] },
-      { city: 'Kota Jakarta Pusat', prov: 'DKI Jakarta', kw: ['jakarta pusat', 'jakpus'] },
-      { city: 'Kota Jakarta Barat', prov: 'DKI Jakarta', kw: ['jakarta barat', 'jakbar'] },
-      { city: 'Kota Jakarta Timur', prov: 'DKI Jakarta', kw: ['jakarta timur', 'jaktim'] },
-      { city: 'Kota Jakarta Utara', prov: 'DKI Jakarta', kw: ['jakarta utara', 'jakut'] },
-      { city: 'DKI Jakarta', prov: 'DKI Jakarta', kw: ['jakarta'] },
-      { city: 'Kota Surabaya', prov: 'Jawa Timur', kw: ['surabaya', 'jatim'] },
-      { city: 'Kota Semarang', prov: 'Jawa Tengah', kw: ['semarang', 'jateng'] },
-      { city: 'Kota Medan', prov: 'Sumatera Utara', kw: ['medan', 'sumut'] },
-      { city: 'Kota Tangerang', prov: 'Banten', kw: ['tangerang', 'bsd', 'banten'] },
-      { city: 'Kota Denpasar', prov: 'Bali', kw: ['denpasar', 'bali'] },
-      { city: 'Kota Makassar', prov: 'Sulawesi Selatan', kw: ['makassar'] },
-      { city: 'Kota Yogyakarta', prov: 'DI Yogyakarta', kw: ['yogyakarta', 'jogja'] },
+  /**
+   * Parse ground-truth province and city directly from official Indonesian address
+   */
+  static parseIndonesianAddress(
+    address: string,
+    fallbackProvince?: string,
+    fallbackCity?: string
+  ): { city: string; province: string } {
+    if (!address) {
+      return {
+        city: fallbackCity || 'Indonesia',
+        province: fallbackProvince || 'Indonesia',
+      };
+    }
+
+    const clean = address.replace(/\s+/g, ' ');
+    let detectedProvince: string | null = null;
+    let detectedCity: string | null = null;
+
+    // 1. Precise Province Matching against all Indonesian Provinces
+    const provincePatterns: [RegExp, string][] = [
+      [/\b(DKI\s+Jakarta|Jakarta\s+Pusat|Jakarta\s+Selatan|Jakarta\s+Barat|Jakarta\s+Timur|Jakarta\s+Utara|Daerah\s+Khusus\s+Ibukota\s+Jakarta|Jakarta)\b/i, 'DKI Jakarta'],
+      [/\b(Jawa\s+Barat|Jabar)\b/i, 'Jawa Barat'],
+      [/\b(Jawa\s+Tengah|Jateng)\b/i, 'Jawa Tengah'],
+      [/\b(Jawa\s+Timur|Jatim)\b/i, 'Jawa Timur'],
+      [/\b(Banten)\b/i, 'Banten'],
+      [/\b(D\.?I\.?\s*Yogyakarta|Yogyakarta|Jogja|Daerah\s+Istimewa\s+Yogyakarta)\b/i, 'DI Yogyakarta'],
+      [/\b(Bali)\b/i, 'Bali'],
+      [/\b(Sumatera\s+Utara|Sumut)\b/i, 'Sumatera Utara'],
+      [/\b(Sumatera\s+Barat|Sumbar)\b/i, 'Sumatera Barat'],
+      [/\b(Sumatera\s+Selatan|Sumsel)\b/i, 'Sumatera Selatan'],
+      [/\b(Riau)\b/i, 'Riau'],
+      [/\b(Kepulauan\s+Riau|Kepri)\b/i, 'Kepulauan Riau'],
+      [/\b(Lampung)\b/i, 'Lampung'],
+      [/\b(Jambi)\b/i, 'Jambi'],
+      [/\b(Bengkulu)\b/i, 'Bengkulu'],
+      [/\b(Bangka\s+Belitung|Babel)\b/i, 'Bangka Belitung'],
+      [/\b(Aceh|Nanggroe\s+Aceh\s+Darussalam)\b/i, 'Aceh'],
+      [/\b(Kalimantan\s+Barat|Kalbar)\b/i, 'Kalimantan Barat'],
+      [/\b(Kalimantan\s+Selatan|Kalsel)\b/i, 'Kalimantan Selatan'],
+      [/\b(Kalimantan\s+Timur|Kaltim)\b/i, 'Kalimantan Timur'],
+      [/\b(Kalimantan\s+Tengah|Kalteng)\b/i, 'Kalimantan Tengah'],
+      [/\b(Kalimantan\s+Utara|Kaltara)\b/i, 'Kalimantan Utara'],
+      [/\b(Sulawesi\s+Selatan|Sulsel)\b/i, 'Sulawesi Selatan'],
+      [/\b(Sulawesi\s+Utara|Sulut)\b/i, 'Sulawesi Utara'],
+      [/\b(Sulawesi\s+Tengah|Sulteng)\b/i, 'Sulawesi Tengah'],
+      [/\b(Sulawesi\s+Tenggara|Sultra)\b/i, 'Sulawesi Tenggara'],
+      [/\b(Sulawesi\s+Barat|Sulbar)\b/i, 'Sulawesi Barat'],
+      [/\b(Gorontalo)\b/i, 'Gorontalo'],
+      [/\b(Nusa\s+Tenggara\s+Barat|NTB)\b/i, 'Nusa Tenggara Barat'],
+      [/\b(Nusa\s+Tenggara\s+Timur|NTT)\b/i, 'Nusa Tenggara Timur'],
+      [/\b(Maluku\s+Utara)\b/i, 'Maluku Utara'],
+      [/\b(Maluku)\b/i, 'Maluku'],
+      [/\b(Papua\s+Barat\s+Daya)\b/i, 'Papua Barat Daya'],
+      [/\b(Papua\s+Barat)\b/i, 'Papua Barat'],
+      [/\b(Papua\s+Selatan)\b/i, 'Papua Selatan'],
+      [/\b(Papua\s+Tengah)\b/i, 'Papua Tengah'],
+      [/\b(Papua\s+Pegunungan)\b/i, 'Papua Pegunungan'],
+      [/\b(Papua)\b/i, 'Papua'],
     ];
 
-    for (const loc of indonesianLocations) {
-      if (loc.kw.some((k) => combined.includes(k))) {
-        return { city: loc.city, province: loc.prov };
+    for (const [pattern, prov] of provincePatterns) {
+      if (pattern.test(clean)) {
+        detectedProvince = prov;
+        break;
       }
     }
 
-    return { city: 'Indonesia', province: 'Indonesia' };
+    // 2. City / Regency Matching from Address
+    const cityRegex = /(?:Kota|Kabupaten|Kab\.)\s+([A-Za-z\s]+?)(?:,|$|\d)/i;
+    const cityMatch = clean.match(cityRegex);
+    if (cityMatch && cityMatch[1]) {
+      const rawCityName = cityMatch[1].trim();
+      if (rawCityName.length > 2 && rawCityName.length < 30) {
+        const isKab = /Kabupaten|Kab\./i.test(cityMatch[0]);
+        detectedCity = (isKab ? 'Kabupaten ' : 'Kota ') + rawCityName;
+      }
+    }
+
+    if (!detectedCity) {
+      const knownCities = [
+        { name: 'Kota Bandung', kw: ['bandung', 'cimahi'] },
+        { name: 'Kota Bogor', kw: ['bogor'] },
+        { name: 'Kota Bekasi', kw: ['bekasi', 'cikarang'] },
+        { name: 'Kota Depok', kw: ['depok'] },
+        { name: 'Kota Tangerang', kw: ['tangerang', 'bsd', 'serpong'] },
+        { name: 'Kota Tangerang Selatan', kw: ['tangerang selatan', 'tangsel', 'pamulang', 'ciputat', 'bintaro'] },
+        { name: 'Kota Jakarta Selatan', kw: ['jakarta selatan', 'jaksel'] },
+        { name: 'Kota Jakarta Pusat', kw: ['jakarta pusat', 'jakpus'] },
+        { name: 'Kota Jakarta Barat', kw: ['jakarta barat', 'jakbar'] },
+        { name: 'Kota Jakarta Timur', kw: ['jakarta timur', 'jaktim'] },
+        { name: 'Kota Jakarta Utara', kw: ['jakarta utara', 'jakut'] },
+        { name: 'Kota Surabaya', kw: ['surabaya'] },
+        { name: 'Kota Semarang', kw: ['semarang'] },
+        { name: 'Kota Medan', kw: ['medan'] },
+        { name: 'Kota Denpasar', kw: ['denpasar', 'kuta', 'badung'] },
+        { name: 'Kota Makassar', kw: ['makassar'] },
+        { name: 'Kota Yogyakarta', kw: ['yogyakarta', 'sleman', 'bantul'] },
+      ];
+      for (const c of knownCities) {
+        if (c.kw.some((k) => clean.toLowerCase().includes(k))) {
+          detectedCity = c.name;
+          break;
+        }
+      }
+    }
+
+    // 3. Known City-to-Province associations
+    if (!detectedProvince && detectedCity) {
+      if (detectedCity.includes('Tangerang')) detectedProvince = 'Banten';
+      else if (detectedCity.includes('Jakarta')) detectedProvince = 'DKI Jakarta';
+      else if (detectedCity.includes('Bandung') || detectedCity.includes('Bogor') || detectedCity.includes('Bekasi') || detectedCity.includes('Depok')) detectedProvince = 'Jawa Barat';
+      else if (detectedCity.includes('Semarang')) detectedProvince = 'Jawa Tengah';
+      else if (detectedCity.includes('Surabaya')) detectedProvince = 'Jawa Timur';
+      else if (detectedCity.includes('Denpasar')) detectedProvince = 'Bali';
+      else if (detectedCity.includes('Medan')) detectedProvince = 'Sumatera Utara';
+      else if (detectedCity.includes('Yogyakarta')) detectedProvince = 'DI Yogyakarta';
+      else if (detectedCity.includes('Makassar')) detectedProvince = 'Sulawesi Selatan';
+    }
+
+    return {
+      province: detectedProvince || fallbackProvince || 'Indonesia',
+      city: detectedCity || fallbackCity || 'Indonesia',
+    };
   }
 
   /**
@@ -204,8 +337,13 @@ export class GmapsScraperService {
       const page: Page = await browser.newPage();
       await page.setViewport({ width: 1366, height: 900 });
 
-      // Navigate to Google Maps search in Indonesian
-      const targetUrl = `https://www.google.com/maps/search/${encodeURIComponent(finalQuery)}?hl=id`;
+      // Navigate to Google Maps search in Indonesian, centered on target province coordinates if specified
+      let targetUrl = `https://www.google.com/maps/search/${encodeURIComponent(finalQuery)}?hl=id`;
+      if (targetProvince && GmapsScraperService.PROVINCE_COORDINATES[targetProvince]) {
+        const coord = GmapsScraperService.PROVINCE_COORDINATES[targetProvince];
+        await page.setGeolocation({ latitude: coord.lat, longitude: coord.lng }).catch(() => null);
+        targetUrl = `https://www.google.com/maps/search/${encodeURIComponent(finalQuery)}/@${coord.lat},${coord.lng},${coord.zoom}z?hl=id`;
+      }
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
       await page.waitForSelector('a[href*="/maps/place/"], div[role="feed"], h1', { timeout: 20000 }).catch(() => null);
 
@@ -248,30 +386,59 @@ export class GmapsScraperService {
                 if (starMatch) cardRating = parseFloat(starMatch[1].replace(',', '.'));
               }
 
-              // Extract actual review count - MUST NOT match telephone area codes like (021), (022), etc.
-              const reviewEl = parent?.querySelector('span[aria-label*="ulasan"], span[aria-label*="reviews"], span.UY7F9');
+              // Extract actual review count
               let cardReviewCount: number | null = null;
-              if (reviewEl) {
-                const reviewLabel = reviewEl.getAttribute('aria-label') || reviewEl.textContent || '';
-                const reviewMatch = reviewLabel.match(/(\d+[\.,]?\d*)/);
-                if (reviewMatch) {
-                  cardReviewCount = parseInt(reviewMatch[1].replace(/[\.,]/g, ''), 10);
-                }
-              } else {
-                // Only match if explicitly followed by ulasan or reviews, never standalone parentheses like phone code
-                const parentText = (parent as HTMLElement)?.innerText || '';
-                const explicitReviewMatch = parentText.match(/\((\d+[\.,]?\d*)\s*(?:ulasan|reviews)\)/i) || 
-                                            parentText.match(/(\d+[\.,]?\d*)\s+(?:ulasan|reviews)/i);
-                if (explicitReviewMatch) {
-                  cardReviewCount = parseInt(explicitReviewMatch[1].replace(/[\.,]/g, ''), 10);
+              if (starEl) {
+                const starLabel = starEl.getAttribute('aria-label') || '';
+                const reviewMatch = starLabel.match(/(\d+[\.,]?\d*)\s*(?:ulasan|reviews)/i);
+                if (reviewMatch) cardReviewCount = parseInt(reviewMatch[1].replace(/[\.,]/g, ''), 10);
+              }
+
+              if (cardReviewCount === null) {
+                const reviewEl = parent?.querySelector('span[aria-label*="ulasan"], span[aria-label*="reviews"], span.UY7F9');
+                if (reviewEl) {
+                  const reviewLabel = reviewEl.getAttribute('aria-label') || reviewEl.textContent || '';
+                  const reviewMatch = reviewLabel.match(/(\d+[\.,]?\d*)/);
+                  if (reviewMatch) {
+                    cardReviewCount = parseInt(reviewMatch[1].replace(/[\.,]/g, ''), 10);
+                  }
                 }
               }
 
-              // Extract real category from card subtitle e.g. "Dewan pendidikan ·  · Jl. A. Yani"
+              if (cardReviewCount === null && starEl) {
+                const parentText = (parent as HTMLElement)?.innerText || '';
+                const parenMatch = parentText.match(/\(([0-9\.,]+)\)/);
+                if (parenMatch && !parenMatch[1].startsWith('02') && !parenMatch[1].startsWith('03') && !parenMatch[1].startsWith('08')) {
+                  cardReviewCount = parseInt(parenMatch[1].replace(/[\.,]/g, ''), 10);
+                }
+              }
+
+              // Extract real category from card subtitle, validating it is NOT address text
               const w4divs = Array.from(parent?.querySelectorAll('div.W4Efsd') || []);
-              const catDiv = w4divs.find((d) => d.textContent?.includes('·'));
-              const catText = catDiv?.textContent || '';
-              const cardCategory = catText ? catText.split('·')[0].trim() : null;
+              let cardCategory: string | null = null;
+              const cleanCategoryCandidate = (raw: string | null | undefined): string | null => {
+                if (!raw) return null;
+                const trimmed = raw.trim();
+                if (trimmed.length < 2 || trimmed.length > 40) return null;
+                const invalidKeywords = ['jl.', 'jalan', 'rt.', 'rw.', 'no.', 'km', 'samping', 'dekat', 'buka', 'tutup', '24 jam', 'hasil', 'ulasan'];
+                if (invalidKeywords.some(k => trimmed.toLowerCase().includes(k))) return null;
+                return trimmed;
+              };
+
+              for (const div of w4divs) {
+                const text = div.textContent || '';
+                if (text.includes('·')) {
+                  const parts = text.split('·').map(p => p.trim());
+                  for (const part of parts) {
+                    const candidate = cleanCategoryCandidate(part);
+                    if (candidate) {
+                      cardCategory = candidate;
+                      break;
+                    }
+                  }
+                }
+                if (cardCategory) break;
+              }
 
               return { rawName, mapsUrl, cardRating, cardReviewCount, cardCategory };
             });
@@ -292,14 +459,20 @@ export class GmapsScraperService {
               const mainPane = document.querySelector('div[role="main"]') as HTMLElement | null;
               const fullText = mainPane?.innerText || (document.body as HTMLElement).innerText || '';
 
-              // Phone number
+              // Phone number with validation
               const phoneBtn = document.querySelector(
                 'button[data-tooltip*="Salin nomor telepon"], button[aria-label*="Telepon:"], button[data-item-id*="phone"]'
               );
-              let phone = phoneBtn ? (phoneBtn.getAttribute('aria-label') || '').replace(/^Telepon:\s*/i, '').trim() : null;
+              let phone = phoneBtn ? (phoneBtn.getAttribute('aria-label') || phoneBtn.textContent || '').replace(/^Telepon:\s*/i, '').trim() : null;
               if (!phone) {
                 const phoneMatch = fullText.match(/(?:\+62|62|08|\(0\d{2,3}\)|0\d{2,3})[\s-]?\d{3,4}[\s-]?\d{3,5}/);
-                phone = phoneMatch ? phoneMatch[0].trim() : null;
+                if (phoneMatch) {
+                  const raw = phoneMatch[0].trim();
+                  const digits = raw.replace(/\D/g, '');
+                  if (digits.length >= 9 && digits.length <= 13) {
+                    phone = raw;
+                  }
+                }
               }
 
               // Address
@@ -316,9 +489,12 @@ export class GmapsScraperService {
               );
               const website = webA ? (webA.getAttribute('href') || '').trim() : null;
 
-              // Category in detail pane
+              // Category in detail pane (official Google button)
               const catBtn = document.querySelector('button[jsaction*="category"], button[class*="DkEaL"]');
-              const category = catBtn?.textContent?.trim() || null;
+              let category = catBtn?.textContent?.trim() || null;
+              if (category && (category.includes('·') || category.length > 40 || category.toLowerCase().includes('jl.'))) {
+                category = null;
+              }
 
               // Detailed Rating if not found on card
               const starEl = document.querySelector(
@@ -337,7 +513,7 @@ export class GmapsScraperService {
 
               // Detailed Review count if not found on card
               if (paneReviewCount === null) {
-                const reviewEl = document.querySelector('button[jsaction*="review"], span[aria-label*="ulasan"]');
+                const reviewEl = document.querySelector('button[jsaction*="review"], span[aria-label*="ulasan"], button[data-tab-index="0"]');
                 if (reviewEl) {
                   const label = reviewEl.getAttribute('aria-label') || reviewEl.textContent || '';
                   if (!label.toLowerCase().includes('tidak ada') && !label.toLowerCase().includes('tulis') && !label.toLowerCase().includes('pelajari')) {
@@ -350,13 +526,13 @@ export class GmapsScraperService {
               return { name, phone, address, website, category, paneRating, paneReviewCount };
             }, cardData.rawName);
 
-            const location = this.inferLocation(detail.address || '', finalQuery);
+            const location = GmapsScraperService.parseIndonesianAddress(detail.address || '', targetProvince, targetCity);
             const resolvedName = (detail.name && detail.name !== 'Hasil') ? detail.name : cardData.rawName;
-            const resolvedProvince = targetProvince || location.province;
-            const resolvedCity = targetCity || location.city;
+            const resolvedProvince = location.province;
+            const resolvedCity = location.city;
             const resolvedRating = cardData.cardRating ?? detail.paneRating ?? null;
             const resolvedReviewCount = cardData.cardReviewCount ?? detail.paneReviewCount ?? null;
-            const resolvedCategory = cardData.cardCategory || detail.category || (targetCategory || 'Bisnis / Perusahaan');
+            const resolvedCategory = detail.category || cardData.cardCategory || (targetCategory || 'Bisnis / Perusahaan');
 
             places.push({
               businessName: resolvedName,
@@ -440,9 +616,7 @@ export class GmapsScraperService {
         });
 
         if (singleDetail) {
-          const location = this.inferLocation(singleDetail.address || '', finalQuery);
-          const resolvedProvince = targetProvince || location.province;
-          const resolvedCity = targetCity || location.city;
+          const location = GmapsScraperService.parseIndonesianAddress(singleDetail.address || '', targetProvince, targetCity);
           const resolvedCategory = singleDetail.category || (targetCategory || 'Bisnis / Perusahaan');
 
           places.push({
@@ -452,8 +626,8 @@ export class GmapsScraperService {
             reviewCount: singleDetail.reviewCount,
             businessAddress: singleDetail.address,
             businessCategory: resolvedCategory,
-            city: resolvedCity,
-            province: resolvedProvince,
+            city: location.city,
+            province: location.province,
             websiteUrl: singleDetail.website,
             mapsUrl: page.url().split('?')[0],
           });
@@ -495,9 +669,12 @@ export class GmapsScraperService {
             where: { id: existing.id },
             data: {
               phone: place.phone || existing.phone,
-              rating: place.rating !== undefined ? place.rating : existing.rating,
-              reviewCount: place.reviewCount !== undefined ? place.reviewCount : existing.reviewCount,
+              rating: place.rating !== null ? place.rating : existing.rating,
+              reviewCount: place.reviewCount !== null ? place.reviewCount : existing.reviewCount,
               businessAddress: place.businessAddress || existing.businessAddress,
+              businessCategory: place.businessCategory || existing.businessCategory,
+              city: place.city || existing.city,
+              province: place.province || existing.province,
               websiteUrl: place.websiteUrl || existing.websiteUrl,
               mapsUrl: place.mapsUrl || existing.mapsUrl,
               dataSource: 'GOOGLE_MAPS_REAL',
