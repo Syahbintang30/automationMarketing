@@ -18,6 +18,9 @@ describe('Phase 4: AI Email Draft Generation & Review Workflow', () => {
       include: { leadCampaigns: { include: { lead: true } } },
     });
     campaignId = campaign!.id;
+
+    // Reset drafts for test idempotency
+    await prisma.emailDraft.deleteMany({ where: { campaignId } });
   });
 
   it('POST /api/v1/campaigns/:id/drafts should generate AI drafts for eligible leads', async () => {

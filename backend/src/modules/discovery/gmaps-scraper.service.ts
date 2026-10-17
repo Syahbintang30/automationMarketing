@@ -146,10 +146,11 @@ export class GmapsScraperService {
 
       // Navigate to Google Maps search in Indonesian
       const targetUrl = `https://www.google.com/maps/search/${encodeURIComponent(finalQuery)}?hl=id`;
-      await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 35000 });
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.waitForSelector('a[href*="/maps/place/"], div[role="feed"], h1', { timeout: 20000 }).catch(() => null);
 
       // Check if we got a Feed list OR a Direct Place Page
-      const feedExists = await page.waitForSelector('div[role="feed"]', { timeout: 7000 }).catch(() => null);
+      const feedExists = await page.$('div[role="feed"], a[href*="/maps/place/"]');
 
       if (feedExists) {
         // --- CASE A: Feed of multiple places ---
@@ -169,10 +170,47 @@ export class GmapsScraperService {
         for (let i = 0; i < countToInspect; i++) {
           try {
             const handle = placeHandles[i];
-            const rawName = await handle.evaluate((el) => el.getAttribute('aria-label') || el.textContent?.trim());
-            const mapsUrl = await handle.evaluate((el) => (el as HTMLAnchorElement).href.split('?')[0]);
+            
+            // Extract card-level data directly from the listing
+            const cardData = await handle.evaluate((el) => {
+              const rawName = el.getAttribute('aria-label') || el.textContent?.trim() || '';
+              const mapsUrl = (el as HTMLAnchorElement).href.split('?')[0];
+              const parent = el.closest('div[jsaction]') || el.parentElement;
 
-            if (!rawName || places.some((p) => p.businessName === rawName)) continue;
+              // Extract actual star rating from aria-label e.g. "3,4 bintang" or "4,5 bintang"
+              const starEl = parent?.querySelector(
+                'span[role="img"][aria-label*="bintang"], span[aria-label*="bintang"], span[aria-label*="stars"], span.ZkP5Je, span.MW4etd'
+              );
+              let cardRating: number | null = null;
+              if (starEl) {
+                const starLabel = starEl.getAttribute('aria-label') || starEl.textContent || '';
+                const starMatch = starLabel.match(/([1-5][,\.]\d)/);
+                if (starMatch) cardRating = parseFloat(starMatch[1].replace(',', '.'));
+              }
+
+              // Extract actual review count - MUST NOT match telephone area codes like (021), (022), etc.
+              const reviewEl = parent?.querySelector('span[aria-label*="ulasan"], span[aria-label*="reviews"], span.UY7F9');
+              let cardReviewCount: number | null = null;
+              if (reviewEl) {
+                const reviewLabel = reviewEl.getAttribute('aria-label') || reviewEl.textContent || '';
+                const reviewMatch = reviewLabel.match(/(\d+[\.,]?\d*)/);
+                if (reviewMatch) {
+                  cardReviewCount = parseInt(reviewMatch[1].replace(/[\.,]/g, ''), 10);
+                }
+              } else {
+                // Only match if explicitly followed by ulasan or reviews, never standalone parentheses like phone code
+                const parentText = (parent as HTMLElement)?.innerText || '';
+                const explicitReviewMatch = parentText.match(/\((\d+[\.,]?\d*)\s*(?:ulasan|reviews)\)/i) || 
+                                            parentText.match(/(\d+[\.,]?\d*)\s+(?:ulasan|reviews)/i);
+                if (explicitReviewMatch) {
+                  cardReviewCount = parseInt(explicitReviewMatch[1].replace(/[\.,]/g, ''), 10);
+                }
+              }
+
+              return { rawName, mapsUrl, cardRating, cardReviewCount };
+            });
+
+            if (!cardData.rawName || places.some((p) => p.businessName === cardData.rawName)) continue;
 
             // Click the card to open detail pane
             await handle.click().catch(() => null);
@@ -216,34 +254,54 @@ export class GmapsScraperService {
               const catBtn = document.querySelector('button[jsaction*="category"]');
               const category = catBtn?.textContent?.trim() || 'Instansi / Bisnis';
 
-              // Rating & Review
-              const ratingEl = document.querySelector('span[aria-hidden="true"][class*="fontDisplayLarge"], div[role="main"] span[aria-label*="bintang"]');
-              const ratingText = ratingEl?.textContent?.trim() || '';
-              const ratingMatch = ratingText.match(/\b([1-5][,\.]\d)\b/) || fullText.match(/\b([1-5][,\.]\d)\b/);
-              const rating = ratingMatch ? parseFloat(ratingMatch[1].replace(',', '.')) : null;
+              // Detailed Rating if not found on card
+              const starEl = document.querySelector(
+                'div[role="main"] span.ZkP5Je, div[role="main"] span[role="img"][aria-label*="bintang"], div[role="main"] span[aria-label*="bintang"], span[aria-hidden="true"][class*="fontDisplayLarge"]'
+              );
+              let paneRating: number | null = null;
+              let paneReviewCount: number | null = null;
+              if (starEl) {
+                const label = starEl.getAttribute('aria-label') || starEl.textContent || '';
+                const match = label.match(/([1-5][,\.]\d)/);
+                if (match) paneRating = parseFloat(match[1].replace(',', '.'));
 
-              const reviewMatch = fullText.match(/\((\d+[\.,]?\d*)\s*ulasan\)/i) || fullText.match(/\((\d+[\.,]?\d*)\)/);
-              const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/[\.,]/g, ''), 10) : null;
+                const reviewMatch = label.match(/(\d+[\.,]?\d*)\s*(?:ulasan|reviews)/i);
+                if (reviewMatch) paneReviewCount = parseInt(reviewMatch[1].replace(/[\.,]/g, ''), 10);
+              }
 
-              return { name, phone, address, website, category, rating, reviewCount };
-            }, rawName);
+              // Detailed Review count if not found on card
+              if (paneReviewCount === null) {
+                const reviewEl = document.querySelector('button[jsaction*="review"], span[aria-label*="ulasan"]');
+                if (reviewEl) {
+                  const label = reviewEl.getAttribute('aria-label') || reviewEl.textContent || '';
+                  if (!label.toLowerCase().includes('tidak ada') && !label.toLowerCase().includes('tulis') && !label.toLowerCase().includes('pelajari')) {
+                    const match = label.match(/(\d+[\.,]?\d*)/);
+                    if (match) paneReviewCount = parseInt(match[1].replace(/[\.,]/g, ''), 10);
+                  }
+                }
+              }
+
+              return { name, phone, address, website, category, paneRating, paneReviewCount };
+            }, cardData.rawName);
 
             const location = this.inferLocation(detail.address || '', finalQuery);
-            const resolvedName = (detail.name && detail.name !== 'Hasil') ? detail.name : rawName;
+            const resolvedName = (detail.name && detail.name !== 'Hasil') ? detail.name : cardData.rawName;
             const resolvedProvince = targetProvince || location.province;
             const resolvedCity = targetCity || location.city;
+            const resolvedRating = cardData.cardRating ?? detail.paneRating ?? null;
+            const resolvedReviewCount = cardData.cardReviewCount ?? detail.paneReviewCount ?? null;
 
             places.push({
               businessName: resolvedName,
               phone: detail.phone,
-              rating: detail.rating,
-              reviewCount: detail.reviewCount,
+              rating: resolvedRating,
+              reviewCount: resolvedReviewCount,
               businessAddress: detail.address,
               businessCategory: detail.category || 'Instansi / Bisnis',
               city: resolvedCity,
               province: resolvedProvince,
               websiteUrl: detail.website,
-              mapsUrl,
+              mapsUrl: cardData.mapsUrl,
             });
           } catch {
             // Continue next item
@@ -282,11 +340,29 @@ export class GmapsScraperService {
           const catBtn = document.querySelector('button[jsaction*="category"]');
           const category = catBtn?.textContent?.trim() || 'Instansi / Bisnis';
 
-          const ratingMatch = fullText.match(/\b([1-5][,\.]\d)\b/);
-          const rating = ratingMatch ? parseFloat(ratingMatch[1].replace(',', '.')) : null;
+          // Extract real star rating and review count from aria-label
+          const starEl = document.querySelector('span.ZkP5Je, span[role="img"][aria-label*="bintang"], span[aria-label*="bintang"], span[aria-hidden="true"][class*="fontDisplayLarge"]');
+          let rating: number | null = null;
+          let reviewCount: number | null = null;
+          if (starEl) {
+            const label = starEl.getAttribute('aria-label') || starEl.textContent || '';
+            const match = label.match(/([1-5][,\.]\d)/);
+            if (match) rating = parseFloat(match[1].replace(',', '.'));
 
-          const reviewMatch = fullText.match(/\((\d+[\.,]?\d*)\s*ulasan\)/i) || fullText.match(/\((\d+[\.,]?\d*)\)/);
-          const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/[\.,]/g, ''), 10) : null;
+            const starReviewMatch = label.match(/(\d+[\.,]?\d*)\s*(?:ulasan|reviews)/i);
+            if (starReviewMatch) reviewCount = parseInt(starReviewMatch[1].replace(/[\.,]/g, ''), 10);
+          }
+
+          if (reviewCount === null) {
+            const reviewEl = document.querySelector('button[jsaction*="review"], span[aria-label*="ulasan"]');
+            if (reviewEl) {
+              const label = reviewEl.getAttribute('aria-label') || reviewEl.textContent || '';
+              if (!label.toLowerCase().includes('tidak ada') && !label.toLowerCase().includes('tulis') && !label.toLowerCase().includes('pelajari')) {
+                const match = label.match(/(\d+[\.,]?\d*)/);
+                if (match) reviewCount = parseInt(match[1].replace(/[\.,]/g, ''), 10);
+              }
+            }
+          }
 
           return { name, phone, address, website, category, rating, reviewCount };
         });
@@ -318,7 +394,12 @@ export class GmapsScraperService {
     let savedCount = 0;
     let updatedCount = 0;
 
-    for (const place of places) {
+    const baseTime = Date.now();
+    for (let index = 0; index < places.length; index++) {
+      const place = places[index];
+      // Ensure the first scraped place has the latest timestamp so it shows at the very top of page 1
+      const itemTimestamp = new Date(baseTime + (places.length - index) * 1000);
+
       const existing = await prisma.lead.findFirst({
         where: {
           OR: [
@@ -337,12 +418,14 @@ export class GmapsScraperService {
           where: { id: existing.id },
           data: {
             phone: place.phone || existing.phone,
-            rating: place.rating ?? existing.rating,
-            reviewCount: place.reviewCount ?? existing.reviewCount,
+            rating: place.rating !== undefined ? place.rating : existing.rating,
+            reviewCount: place.reviewCount !== undefined ? place.reviewCount : existing.reviewCount,
             businessAddress: place.businessAddress || existing.businessAddress,
             websiteUrl: place.websiteUrl || existing.websiteUrl,
             mapsUrl: place.mapsUrl || existing.mapsUrl,
             dataSource: 'GOOGLE_MAPS_REAL',
+            createdAt: itemTimestamp,
+            updatedAt: itemTimestamp,
           },
         });
         updatedCount++;
@@ -362,6 +445,8 @@ export class GmapsScraperService {
             dataSource: 'GOOGLE_MAPS_REAL',
             qualificationStatus: 'QUALIFIED',
             coldCallStatus: 'BELUM_DIHUBUNGI',
+            createdAt: itemTimestamp,
+            updatedAt: itemTimestamp,
           },
         });
         savedCount++;

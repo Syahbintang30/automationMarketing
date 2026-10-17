@@ -47,7 +47,7 @@ export class ExportService {
 
     const leads = await prisma.lead.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { updatedAt: 'desc' }],
       include: {
         leadCampaigns: {
           include: {

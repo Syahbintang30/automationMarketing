@@ -98,7 +98,7 @@ export class LeadsService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { updatedAt: 'desc' }],
         include: {
           leadCampaigns: {
             include: {

@@ -466,6 +466,11 @@ const runGmapsScraper = async () => {
     scrapeSuccess.value = true;
     scrapeMessage.value = res.message || `Berhasil menarik ${res.data?.length || 0} data dari Google Maps!`;
     
+    // Reset to page 1 so the newest scraped entries immediately appear at the very top
+    pagination.value.page = 1;
+    filters.value.search = '';
+    filters.value.coldCallStatus = '';
+    
     // Automatically filter to this province to inspect new results
     if (targetProvince.value) {
       filters.value.province = targetProvince.value;
