@@ -353,7 +353,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { api } from '@/api/client';
 import { INDONESIAN_PROVINCES } from '@/constants/provinces';
 import type { LeadDTO } from '@wardell/shared';
@@ -449,11 +449,53 @@ const changePage = (newPage: number) => {
   fetchLeads();
 };
 
+let pollTimer: any = null;
+
+const startStatusPolling = () => {
+  stopStatusPolling();
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await api.getScrapeStatus();
+      if (res.data) {
+        const status = res.data;
+        if (status.isRunning) {
+          isScraping.value = true;
+          scrapeMessage.value = status.progressMessage || 'Sedang mengekstrak data dari Google Maps... (Aman di-refresh, proses tetap berjalan)';
+        } else {
+          stopStatusPolling();
+          isScraping.value = false;
+          if (status.lastResult) {
+            scrapeSuccess.value = status.lastResult.success;
+            scrapeMessage.value = status.lastResult.message;
+            if (status.lastResult.success) {
+              pagination.value.page = 1;
+              fetchLeads();
+            }
+          }
+        }
+      }
+    } catch {
+      // Continue polling silently
+    }
+  }, 2000);
+};
+
+const stopStatusPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+};
+
 const runGmapsScraper = async () => {
   if (isScraping.value) return;
 
   isScraping.value = true;
-  scrapeMessage.value = '';
+  scrapeMessage.value = 'Mempersiapkan proses scraping Google Maps...';
+  scrapeSuccess.value = true;
+
+  // Start polling immediately so page refresh or status update stays seamless
+  startStatusPolling();
 
   try {
     const res = await api.scrapeGmaps({
@@ -463,23 +505,27 @@ const runGmapsScraper = async () => {
       limit: scrapeLimit.value,
     });
 
-    scrapeSuccess.value = true;
-    scrapeMessage.value = res.message || `Berhasil menarik ${res.data?.length || 0} data dari Google Maps!`;
-    
-    // Reset to page 1 so the newest scraped entries immediately appear at the very top
-    pagination.value.page = 1;
-    filters.value.search = '';
-    filters.value.coldCallStatus = '';
-    
-    // Automatically filter to this province to inspect new results
-    if (targetProvince.value) {
-      filters.value.province = targetProvince.value;
+    if ((res as any).isRunning) {
+      scrapeMessage.value = res.message || 'Scraping sedang berjalan di latar belakang...';
+    } else {
+      scrapeSuccess.value = true;
+      scrapeMessage.value = res.message || `Berhasil menarik ${res.data?.length || 0} data dari Google Maps!`;
+      
+      // Reset to page 1 so the newest scraped entries immediately appear at the very top
+      pagination.value.page = 1;
+      filters.value.search = '';
+      filters.value.coldCallStatus = '';
+      
+      // Automatically filter to this province to inspect new results
+      if (targetProvince.value) {
+        filters.value.province = targetProvince.value;
+      }
+      await fetchLeads();
     }
-    await fetchLeads();
   } catch (err: any) {
     scrapeSuccess.value = false;
     scrapeMessage.value = err.message || 'Gagal melakukan scraping Google Maps. Pastikan Chrome terinstall.';
-  } finally {
+    stopStatusPolling();
     isScraping.value = false;
   }
 };
@@ -542,7 +588,25 @@ const exportData = async (format: 'xlsx' | 'csv') => {
   });
 };
 
-onMounted(fetchLeads);
+onMounted(async () => {
+  fetchLeads();
+
+  // Restore active background scraping state if page was refreshed during scraping
+  try {
+    const res = await api.getScrapeStatus();
+    if (res.data?.isRunning) {
+      isScraping.value = true;
+      scrapeMessage.value = res.data.progressMessage || 'Melanjutkan pantauan scraping dari latar belakang... (Aman di-refresh)';
+      startStatusPolling();
+    }
+  } catch {
+    // Ignore error on initial status check
+  }
+});
+
+onUnmounted(() => {
+  stopStatusPolling();
+});
 </script>
 
 <style scoped>

@@ -23,7 +23,36 @@ export interface ScrapeGmapsInput {
   limit?: number;
 }
 
+export interface ScrapeJobStatus {
+  isRunning: boolean;
+  queryUsed?: string;
+  targetProvince?: string;
+  targetCategory?: string;
+  progressMessage: string;
+  startedAt?: string;
+  lastResult?: {
+    success: boolean;
+    count: number;
+    savedCount: number;
+    updatedCount: number;
+    message: string;
+    completedAt: string;
+  } | null;
+}
+
 export class GmapsScraperService {
+  private static activeJobStatus: ScrapeJobStatus = {
+    isRunning: false,
+    progressMessage: 'Siap melakukan scraping',
+    lastResult: null,
+  };
+
+  /**
+   * Get current background scraping status
+   */
+  static getStatus(): ScrapeJobStatus {
+    return this.activeJobStatus;
+  }
   /**
    * Resolve local Google Chrome binary path on macOS / Linux
    */
@@ -97,21 +126,23 @@ export class GmapsScraperService {
     let finalQuery = '';
     let targetProvince = '';
     let targetCity = '';
+    let targetCategory = '';
     let limit = limitParam;
 
     if (typeof input === 'string') {
       finalQuery = input.trim();
+      targetCategory = input.trim();
       limit = limitParam;
     } else {
       targetProvince = input.province?.trim() || '';
       targetCity = input.city?.trim() || '';
-      const cat = (input.category || input.query || '').trim();
+      targetCategory = (input.category || input.query || '').trim();
       limit = input.limit || limitParam || 20;
 
       // Smart Query Mapping for Government & Institutions:
       // Google Maps indexes official institutions under "kantor dinas pemerintah", "dinas [kategori]", or "kantor pemerintah"
-      let searchCategory = cat;
-      const lowerCat = cat.toLowerCase();
+      let searchCategory = targetCategory;
+      const lowerCat = targetCategory.toLowerCase();
       if (!lowerCat || lowerCat === 'instansi' || lowerCat === 'instansi pemerintah' || lowerCat === 'kantor instansi') {
         searchCategory = 'kantor dinas pemerintah';
       } else if (lowerCat === 'pemda' || lowerCat === 'pemerintah daerah' || lowerCat === 'pemerintah') {
@@ -133,24 +164,41 @@ export class GmapsScraperService {
       }
     }
 
-    const executablePath = this.getChromeExecutablePath();
+    if (this.activeJobStatus.isRunning) {
+      throw new Error(
+        `Scraping Google Maps saat ini sedang berjalan untuk "${this.activeJobStatus.queryUsed}". Halaman dapat di-refresh dan hasil akan otomatis muncul.`
+      );
+    }
 
-    const browser: Browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--lang=id-ID,id',
-      ],
-    });
+    this.activeJobStatus = {
+      isRunning: true,
+      queryUsed: finalQuery,
+      targetProvince: targetProvince || undefined,
+      targetCategory: targetCategory || undefined,
+      progressMessage: `Sedang membuka Google Maps untuk "${finalQuery}"...`,
+      startedAt: new Date().toISOString(),
+      lastResult: this.activeJobStatus.lastResult,
+    };
 
+    let browser: Browser | null = null;
     const places: ScrapedPlace[] = [];
 
     try {
+      const executablePath = this.getChromeExecutablePath();
+
+      browser = await puppeteer.launch({
+        executablePath,
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--disable-gpu',
+          '--lang=id-ID,id',
+        ],
+      });
+
       const page: Page = await browser.newPage();
       await page.setViewport({ width: 1366, height: 900 });
 
@@ -306,7 +354,7 @@ export class GmapsScraperService {
             const resolvedCity = targetCity || location.city;
             const resolvedRating = cardData.cardRating ?? detail.paneRating ?? null;
             const resolvedReviewCount = cardData.cardReviewCount ?? detail.paneReviewCount ?? null;
-            const resolvedCategory = cardData.cardCategory || detail.category || (cat || 'Kantor Pemerintah');
+            const resolvedCategory = cardData.cardCategory || detail.category || (targetCategory || 'Kantor Pemerintah');
 
             places.push({
               businessName: resolvedName,
@@ -355,7 +403,7 @@ export class GmapsScraperService {
           const website = webA ? (webA.getAttribute('href') || '').trim() : null;
 
           const catBtn = document.querySelector('button[jsaction*="category"], button[class*="DkEaL"]');
-          let category = catBtn?.textContent?.trim();
+          let category: string | null = catBtn?.textContent?.trim() || null;
           if (!category) {
             const h1 = document.querySelector('h1');
             const subBtn = h1?.closest('div[role="main"]')?.querySelector('button[class*="fontTitleSmall"], div[class*="fontBodyMedium"] button');
@@ -393,7 +441,7 @@ export class GmapsScraperService {
           const location = this.inferLocation(singleDetail.address || '', finalQuery);
           const resolvedProvince = targetProvince || location.province;
           const resolvedCity = targetCity || location.city;
-          const resolvedCategory = singleDetail.category || (cat || 'Kantor Pemerintah');
+          const resolvedCategory = singleDetail.category || (targetCategory || 'Kantor Pemerintah');
 
           places.push({
             businessName: singleDetail.name,
@@ -409,73 +457,110 @@ export class GmapsScraperService {
           });
         }
       }
-    } finally {
-      await browser.close().catch(() => null);
-    }
 
-    // Upsert into Database (Lead Table)
-    let savedCount = 0;
-    let updatedCount = 0;
+      if (browser) {
+        await browser.close().catch(() => null);
+        browser = null;
+      }
 
-    const baseTime = Date.now();
-    for (let index = 0; index < places.length; index++) {
-      const place = places[index];
-      // Ensure the first scraped place has the latest timestamp so it shows at the very top of page 1
-      const itemTimestamp = new Date(baseTime + (places.length - index) * 1000);
+      // Upsert into Database (Lead Table)
+      let savedCount = 0;
+      let updatedCount = 0;
 
-      const existing = await prisma.lead.findFirst({
-        where: {
-          OR: [
-            ...(place.mapsUrl ? [{ mapsUrl: place.mapsUrl }] : []),
-            ...(place.phone ? [{ phone: place.phone }] : []),
-            {
-              businessName: { equals: place.businessName, mode: 'insensitive' },
-              city: { equals: place.city, mode: 'insensitive' },
+      this.activeJobStatus.progressMessage = `Menyimpan ${places.length} data ke database leads...`;
+
+      const baseTime = Date.now();
+      for (let index = 0; index < places.length; index++) {
+        const place = places[index];
+        // Ensure the first scraped place has the latest timestamp so it shows at the very top of page 1
+        const itemTimestamp = new Date(baseTime + (places.length - index) * 1000);
+
+        const existing = await prisma.lead.findFirst({
+          where: {
+            OR: [
+              ...(place.mapsUrl ? [{ mapsUrl: place.mapsUrl }] : []),
+              ...(place.phone ? [{ phone: place.phone }] : []),
+              {
+                businessName: { equals: place.businessName, mode: 'insensitive' },
+                city: { equals: place.city, mode: 'insensitive' },
+              },
+            ],
+          },
+        });
+
+        if (existing) {
+          await prisma.lead.update({
+            where: { id: existing.id },
+            data: {
+              phone: place.phone || existing.phone,
+              rating: place.rating !== undefined ? place.rating : existing.rating,
+              reviewCount: place.reviewCount !== undefined ? place.reviewCount : existing.reviewCount,
+              businessAddress: place.businessAddress || existing.businessAddress,
+              websiteUrl: place.websiteUrl || existing.websiteUrl,
+              mapsUrl: place.mapsUrl || existing.mapsUrl,
+              dataSource: 'GOOGLE_MAPS_REAL',
+              createdAt: itemTimestamp,
+              updatedAt: itemTimestamp,
             },
-          ],
-        },
-      });
+          });
+          updatedCount++;
+        } else {
+          await prisma.lead.create({
+            data: {
+              businessName: place.businessName,
+              businessCategory: place.businessCategory,
+              phone: place.phone,
+              rating: place.rating,
+              reviewCount: place.reviewCount,
+              businessAddress: place.businessAddress,
+              city: place.city,
+              province: place.province,
+              websiteUrl: place.websiteUrl,
+              mapsUrl: place.mapsUrl,
+              dataSource: 'GOOGLE_MAPS_REAL',
+              qualificationStatus: 'QUALIFIED',
+              coldCallStatus: 'BELUM_DIHUBUNGI',
+              createdAt: itemTimestamp,
+              updatedAt: itemTimestamp,
+            },
+          });
+          savedCount++;
+        }
+      }
 
-      if (existing) {
-        await prisma.lead.update({
-          where: { id: existing.id },
-          data: {
-            phone: place.phone || existing.phone,
-            rating: place.rating !== undefined ? place.rating : existing.rating,
-            reviewCount: place.reviewCount !== undefined ? place.reviewCount : existing.reviewCount,
-            businessAddress: place.businessAddress || existing.businessAddress,
-            websiteUrl: place.websiteUrl || existing.websiteUrl,
-            mapsUrl: place.mapsUrl || existing.mapsUrl,
-            dataSource: 'GOOGLE_MAPS_REAL',
-            createdAt: itemTimestamp,
-            updatedAt: itemTimestamp,
-          },
-        });
-        updatedCount++;
-      } else {
-        await prisma.lead.create({
-          data: {
-            businessName: place.businessName,
-            businessCategory: place.businessCategory,
-            phone: place.phone,
-            rating: place.rating,
-            reviewCount: place.reviewCount,
-            businessAddress: place.businessAddress,
-            city: place.city,
-            province: place.province,
-            websiteUrl: place.websiteUrl,
-            mapsUrl: place.mapsUrl,
-            dataSource: 'GOOGLE_MAPS_REAL',
-            qualificationStatus: 'QUALIFIED',
-            coldCallStatus: 'BELUM_DIHUBUNGI',
-            createdAt: itemTimestamp,
-            updatedAt: itemTimestamp,
-          },
-        });
-        savedCount++;
+      this.activeJobStatus = {
+        isRunning: false,
+        progressMessage: `Selesai: ${places.length} data ditemukan (${savedCount} baru, ${updatedCount} diupdate).`,
+        lastResult: {
+          success: true,
+          count: places.length,
+          savedCount,
+          updatedCount,
+          message: `Berhasil menarik ${places.length} data (${savedCount} baru, ${updatedCount} diupdate)!`,
+          completedAt: new Date().toISOString(),
+        },
+      };
+
+      return { places, savedCount, updatedCount, queryUsed: finalQuery, targetProvince: targetProvince || undefined };
+    } catch (err: any) {
+      this.activeJobStatus = {
+        isRunning: false,
+        progressMessage: 'Gagal melakukan scraping',
+        lastResult: {
+          success: false,
+          count: 0,
+          savedCount: 0,
+          updatedCount: 0,
+          message: err.message || 'Gagal mengekstrak data dari Google Maps.',
+          completedAt: new Date().toISOString(),
+        },
+      };
+      throw err;
+    } finally {
+      if (browser) {
+        await browser.close().catch(() => null);
       }
     }
-
-    return { places, savedCount, updatedCount, queryUsed: finalQuery, targetProvince: targetProvince || undefined };
   }
 }
+

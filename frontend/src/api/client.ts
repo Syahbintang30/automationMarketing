@@ -133,6 +133,10 @@ class ApiClient {
     });
   }
 
+  async getScrapeStatus() {
+    return this.request<ApiResponse<any>>('/leads/scrape-status');
+  }
+
   async updateScreening(id: string, data: { coldCallStatus?: string; coldCallNotes?: string }) {
     return this.request<ApiResponse<LeadDTO>>(`/leads/${id}/screening`, {
       method: 'PATCH',

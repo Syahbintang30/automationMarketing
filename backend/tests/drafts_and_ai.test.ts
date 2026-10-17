@@ -19,7 +19,11 @@ describe('Phase 4: AI Email Draft Generation & Review Workflow', () => {
     });
     campaignId = campaign!.id;
 
-    // Reset drafts for test idempotency
+    // Reset leads outreach status & drafts for test idempotency
+    await prisma.lead.updateMany({
+      where: { leadCampaigns: { some: { campaignId } } },
+      data: { outreachStatus: 'NOT_CONTACTED' },
+    });
     await prisma.emailDraft.deleteMany({ where: { campaignId } });
   });
 

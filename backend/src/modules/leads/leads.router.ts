@@ -60,6 +60,15 @@ leadsRouter.get('/', authenticate, async (req: Request, res: Response, next: Nex
   }
 });
 
+// GET /api/v1/leads/scrape-status
+leadsRouter.get('/scrape-status', authenticate, async (req: Request, res: Response) => {
+  const { GmapsScraperService } = await import('../discovery/gmaps-scraper.service');
+  return res.status(200).json({
+    success: true,
+    data: GmapsScraperService.getStatus(),
+  });
+});
+
 // POST /api/v1/leads/scrape-gmaps
 leadsRouter.post('/scrape-gmaps', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -72,6 +81,18 @@ leadsRouter.post('/scrape-gmaps', authenticate, async (req: Request, res: Respon
     }
 
     const { GmapsScraperService } = await import('../discovery/gmaps-scraper.service');
+
+    // If already scraping in background, inform the user gracefully without crashing
+    const currentStatus = GmapsScraperService.getStatus();
+    if (currentStatus.isRunning) {
+      return res.status(200).json({
+        success: true,
+        isRunning: true,
+        message: `Scraping sedang berjalan di latar belakang untuk "${currentStatus.queryUsed}". Halaman aman di-refresh dan hasil akan otomatis muncul.`,
+        data: [],
+      });
+    }
+
     const result = await GmapsScraperService.scrape(
       {
         query: typeof query === 'string' ? query.trim() : undefined,
