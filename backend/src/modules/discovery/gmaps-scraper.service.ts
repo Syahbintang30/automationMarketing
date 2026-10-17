@@ -141,9 +141,9 @@ export class GmapsScraperService {
 
       // Smart Query Mapping for Government & Institutions:
       // Google Maps indexes official institutions under "kantor dinas pemerintah", "dinas [kategori]", or "kantor pemerintah"
-      let searchCategory = targetCategory;
-      const lowerCat = targetCategory.toLowerCase();
-      if (!lowerCat || lowerCat === 'instansi' || lowerCat === 'instansi pemerintah' || lowerCat === 'kantor instansi') {
+      let searchCategory = targetCategory ? targetCategory.trim() : '';
+      const lowerCat = searchCategory.toLowerCase();
+      if (lowerCat === 'instansi' || lowerCat === 'instansi pemerintah' || lowerCat === 'kantor instansi') {
         searchCategory = 'kantor dinas pemerintah';
       } else if (lowerCat === 'pemda' || lowerCat === 'pemerintah daerah' || lowerCat === 'pemerintah') {
         searchCategory = 'kantor dinas pemerintah daerah';
@@ -157,10 +157,12 @@ export class GmapsScraperService {
         finalQuery = `${searchCategory} ${targetCity}`;
       } else if (searchCategory) {
         finalQuery = searchCategory;
+      } else if (targetCity && targetProvince) {
+        finalQuery = `perusahaan dan bisnis di ${targetCity} ${targetProvince}`;
       } else if (targetProvince) {
-        finalQuery = `kantor dinas pemerintah di ${targetProvince}`;
+        finalQuery = `perusahaan dan bisnis di ${targetProvince}`;
       } else {
-        finalQuery = 'kantor dinas pemerintah';
+        finalQuery = 'perusahaan dan bisnis';
       }
     }
 
@@ -354,7 +356,7 @@ export class GmapsScraperService {
             const resolvedCity = targetCity || location.city;
             const resolvedRating = cardData.cardRating ?? detail.paneRating ?? null;
             const resolvedReviewCount = cardData.cardReviewCount ?? detail.paneReviewCount ?? null;
-            const resolvedCategory = cardData.cardCategory || detail.category || (targetCategory || 'Kantor Pemerintah');
+            const resolvedCategory = cardData.cardCategory || detail.category || (targetCategory || 'Bisnis / Perusahaan');
 
             places.push({
               businessName: resolvedName,
@@ -441,7 +443,7 @@ export class GmapsScraperService {
           const location = this.inferLocation(singleDetail.address || '', finalQuery);
           const resolvedProvince = targetProvince || location.province;
           const resolvedCity = targetCity || location.city;
-          const resolvedCategory = singleDetail.category || (targetCategory || 'Kantor Pemerintah');
+          const resolvedCategory = singleDetail.category || (targetCategory || 'Bisnis / Perusahaan');
 
           places.push({
             businessName: singleDetail.name,

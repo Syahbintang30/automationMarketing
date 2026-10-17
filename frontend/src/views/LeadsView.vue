@@ -3,9 +3,9 @@
     <!-- View Header -->
     <div class="view-header">
       <div>
-        <h1 class="page-title">🗺️ Google Maps Scraper & Cold Call Hub</h1>
+        <h1 class="page-title">🎯 Prospect Discovery & Client Reachout Hub</h1>
         <p class="page-subtitle">
-          Scraping data instansi pemerintah & perusahaan real-time <strong>per provinsi</strong> dari Google Maps, screening data, dan export langsung ke Excel (.xlsx).
+          Temukan calon klien bisnis & instansi real-time dari Google Maps untuk cold call, WhatsApp, dan outreach otomatis.
         </p>
       </div>
       <div class="header-actions">
@@ -18,84 +18,147 @@
       </div>
     </div>
 
-    <!-- Scraper Panel (Top Card) with Explicit Province Selection -->
-    <div class="glass-panel scraper-panel">
-      <div class="scraper-header">
-        <div class="scraper-title">
-          <span class="scraper-badge">LIVE GOOGLE MAPS</span>
-          <h3>Tarik Data Baru per Provinsi</h3>
+    <!-- Prospect Discovery & Search Engine Card -->
+    <div class="glass-panel prospect-search-card">
+      <div class="prospect-search-header">
+        <div class="header-badge-title">
+          <span class="pulse-dot"></span>
+          <span class="badge-text">GOOGLE MAPS LEAD ENGINE</span>
+          <span class="card-headline">Mesin Pencari Calon Klien</span>
         </div>
-        <div class="quick-presets">
-          <span class="text-xs text-dim">Contoh Instansi / Bisnis:</span>
-          <button class="preset-chip" @click="setPreset('Jawa Barat', 'Kantor Dinas Pemerintah')">🏛️ Jabar - Kantor Dinas</button>
-          <button class="preset-chip" @click="setPreset('DKI Jakarta', 'Dinas Kesehatan')">🏥 Jakarta - Dinkes</button>
-          <button class="preset-chip" @click="setPreset('Jawa Barat', 'Dinas Pendidikan', 'Bandung')">🏫 Bandung - Disdik</button>
-          <button class="preset-chip" @click="setPreset('Jawa Timur', 'Rumah Sakit Umum', 'Surabaya')">🏥 Surabaya - RS</button>
-          <button class="preset-chip" @click="setPreset('Banten', 'Dinas Perhubungan', 'Serang')">🚦 Serang - Dishub</button>
+        <div class="status-summary-tag" v-if="isScraping">
+          <span class="spinner-small"></span>
+          <span>Sedang Mengekstrak Prospek...</span>
         </div>
       </div>
 
-      <form class="scraper-form-grid" @submit.prevent="runGmapsScraper">
-        <!-- 1. Dropdown Provinsi -->
-        <div class="form-group">
-          <label class="form-label">📍 PROVINSI TARGET</label>
-          <select v-model="targetProvince" class="form-select province-select" :disabled="isScraping">
-            <option value="">-- Pilih Provinsi --</option>
-            <option v-for="prov in INDONESIAN_PROVINCES" :key="prov" :value="prov">
-              {{ prov }}
-            </option>
-          </select>
-        </div>
-
-        <!-- 2. Kategori / Instansi / Bisnis -->
-        <div class="form-group flex-2">
-          <label class="form-label">🏢 KATEGORI / INSTANSI / PERUSAHAAN</label>
-          <div class="search-input-wrapper">
-            <span class="search-icon">🔍</span>
+      <form class="prospect-form" @submit.prevent="runGmapsScraper">
+        <!-- 1. Primary Hero Search Omnibar -->
+        <div class="search-omnibar-group">
+          <label class="omnibar-label">
+            <span>🎯 SIAPA CALON KLIEN YANG INGIN ANDA JANGKAU?</span>
+            <span class="text-xs text-dim">Ketik jenis bisnis, profesi, atau kata kunci target klien Anda</span>
+          </label>
+          <div class="search-omnibar">
+            <span class="omnibar-icon">🔍</span>
             <input
               v-model="targetCategory"
-              class="scrape-input"
-              placeholder="Contoh: Kantor Dinas Pemerintah, Dinas Kesehatan, Dinas Pendidikan, Rumah Sakit..."
+              class="omnibar-input"
+              placeholder="Ketik target klien (misal: Klinik Kecantikan, Software House, Hotel Bintang, Kontraktor, Pabrik...)"
               :disabled="isScraping"
             />
+            <button
+              v-if="targetCategory"
+              type="button"
+              class="omnibar-clear"
+              @click="targetCategory = ''"
+              title="Bersihkan input"
+            >
+              ✕
+            </button>
           </div>
         </div>
 
-        <!-- 3. Kota / Kabupaten (Opsional) -->
-        <div class="form-group">
-          <label class="form-label">🏙️ KOTA / KAB (OPSIONAL)</label>
-          <input
-            v-model="targetCity"
-            class="form-input"
-            placeholder="Semua kota di provinsi ini"
-            :disabled="isScraping"
-          />
-        </div>
+        <!-- 2. Location & Limit Parameter Controls -->
+        <div class="search-parameters-row">
+          <!-- Wilayah / Provinsi -->
+          <div class="param-item">
+            <label class="param-label">📍 WILAYAH / PROVINSI</label>
+            <select v-model="targetProvince" class="form-select param-select" :disabled="isScraping">
+              <option value="">🌐 Seluruh Indonesia (Fleksibel)</option>
+              <option v-for="prov in INDONESIAN_PROVINCES" :key="'p-' + prov" :value="prov">
+                {{ prov }}
+              </option>
+            </select>
+          </div>
 
-        <!-- 4. Limit Selector -->
-        <div class="form-group limit-group">
-          <label class="form-label">🎯 JUMLAH DATA</label>
-          <select v-model="scrapeLimit" class="form-select" :disabled="isScraping">
-            <option :value="10">10 Data</option>
-            <option :value="20">20 Data</option>
-            <option :value="30">30 Data</option>
-            <option :value="50">50 Data</option>
-          </select>
-        </div>
+          <!-- Kota / Kabupaten -->
+          <div class="param-item">
+            <label class="param-label">🏙️ KOTA / KABUPATEN (OPSIONAL)</label>
+            <input
+              v-model="targetCity"
+              class="form-input param-input"
+              placeholder="Semua kota (atau ketik: Bandung, Surabaya...)"
+              :disabled="isScraping"
+            />
+          </div>
 
-        <!-- Submit Button -->
-        <div class="form-group submit-group">
-          <label class="form-label">&nbsp;</label>
-          <button
-            type="submit"
-            class="btn btn-primary scrape-submit-btn"
-            :disabled="isScraping || (!targetCategory.trim() && !targetProvince)"
-          >
-            <span v-if="isScraping" class="spinner-small"></span>
-            <span>{{ isScraping ? 'Mengekstrak...' : '🚀 Mulai Scraping' }}</span>
-          </button>
+          <!-- Target Jumlah Data -->
+          <div class="param-item limit-item">
+            <label class="param-label">🎯 JUMLAH PROSPEK</label>
+            <div class="limit-chips">
+              <button
+                type="button"
+                v-for="l in [10, 20, 30, 50]"
+                :key="l"
+                :class="['limit-chip', { active: scrapeLimit === l }]"
+                @click="scrapeLimit = l"
+                :disabled="isScraping"
+              >
+                {{ l }} Data
+              </button>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="param-item submit-item">
+            <label class="param-label">&nbsp;</label>
+            <button
+              type="submit"
+              class="btn btn-primary prospect-search-btn"
+              :disabled="isScraping || (!targetCategory.trim() && !targetProvince)"
+            >
+              <span v-if="isScraping" class="spinner-small"></span>
+              <span>{{ isScraping ? 'Mencari...' : '🚀 Cari Calon Klien' }}</span>
+            </button>
+          </div>
         </div>
       </form>
+
+      <!-- 3. Categorized Niche Inspiration Bar (Client Reachout Ideas) -->
+      <div class="niche-inspiration-section">
+        <div class="niche-header">
+          <span class="niche-title">💡 Inspirasi Target Klien untuk Reachout:</span>
+          <div class="niche-tabs">
+            <button
+              type="button"
+              v-for="tab in nicheTabs"
+              :key="tab.id"
+              :class="['niche-tab-btn', { active: activeNicheTab === tab.id }]"
+              @click="activeNicheTab = tab.id"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+        </div>
+        <div class="niche-pills">
+          <button
+            type="button"
+            v-for="idea in visibleNiches"
+            :key="idea.label"
+            :class="['niche-pill', { selected: targetCategory === idea.category }]"
+            @click="selectNiche(idea.category)"
+            :disabled="isScraping"
+          >
+            <span>{{ idea.icon }}</span>
+            <span>{{ idea.label }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 4. Transparency Live Search Preview -->
+      <div class="search-preview-bar">
+        <div v-if="targetCategory || targetProvince" class="preview-active">
+          <span class="preview-badge">TARGET PROSPEK</span>
+          <span class="preview-text">
+            {{ searchQueryPreview }}
+          </span>
+        </div>
+        <div v-else class="preview-idle">
+          <span>💡</span>
+          <span>Ketik jenis bisnis atau klik salah satu inspirasi industri di atas untuk memulai pencarian prospek.</span>
+        </div>
+      </div>
 
       <!-- Scrape Status Banner -->
       <div v-if="scrapeMessage" :class="['scrape-alert', scrapeSuccess ? 'alert-success' : 'alert-error']">
@@ -243,13 +306,25 @@
 
               <!-- Nomor Telepon (The most critical field) -->
               <td>
-                <div v-if="lead.phone" class="phone-box">
-                  <a :href="'tel:' + lead.phone" class="phone-link">
-                    📞 {{ lead.phone }}
+                <div v-if="lead.phone" class="phone-action-container">
+                  <div class="phone-box">
+                    <a :href="'tel:' + lead.phone" class="phone-link" title="Panggil via Telepon">
+                      📞 {{ lead.phone }}
+                    </a>
+                    <button class="copy-btn" @click="copyPhone(lead.phone)" title="Salin nomor telepon">
+                      📋
+                    </button>
+                  </div>
+                  <!-- Direct WhatsApp button if mobile number -->
+                  <a
+                    v-if="getWhatsAppUrl(lead.phone, lead.businessName)"
+                    :href="getWhatsAppUrl(lead.phone, lead.businessName)!"
+                    target="_blank"
+                    class="wa-btn"
+                    title="Buka Chat WhatsApp untuk Outreach"
+                  >
+                    💬 WhatsApp
                   </a>
-                  <button class="copy-btn" @click="copyPhone(lead.phone)" title="Salin nomor telepon">
-                    📋
-                  </button>
                 </div>
                 <div v-else class="text-dim text-xs">
                   <span class="badge badge-slate">Tidak ada telp</span>
@@ -349,6 +424,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Floating Toast Notification for Copy / Feedback -->
+    <transition name="toast-fade">
+      <div v-if="toastMessage" class="floating-toast">
+        <span class="toast-icon">📋</span>
+        <span class="toast-text">{{ toastMessage }}</span>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -362,14 +445,128 @@ const leads = ref<LeadDTO[]>([]);
 const pagination = ref({ page: 1, limit: 20, total: 0, totalPages: 1 });
 const loading = ref(false);
 
-// Scraper state with Province & Category focus
-const targetProvince = ref('Jawa Barat');
-const targetCategory = ref('Dinas Kesehatan');
+// Scraper state with clean default state for outreach
+const targetProvince = ref('');
+const targetCategory = ref('');
 const targetCity = ref('');
 const scrapeLimit = ref(20);
 const isScraping = ref(false);
 const scrapeMessage = ref('');
 const scrapeSuccess = ref(true);
+
+// Toast notification for user actions & feedback
+const toastMessage = ref('');
+let toastTimeout: any = null;
+const showToast = (msg: string) => {
+  toastMessage.value = msg;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    toastMessage.value = '';
+  }, 2500);
+};
+
+// Niche inspiration categories for client outreach
+const activeNicheTab = ref('all');
+const nicheTabs = [
+  { id: 'all', label: 'Semua Bidang' },
+  { id: 'b2b', label: '💼 B2B & Tech' },
+  { id: 'health', label: '🏥 Medis & Klinik' },
+  { id: 'hospitality', label: '☕ F&B & Hotel' },
+  { id: 'service', label: '⚖️ Jasa Profesional' },
+  { id: 'gov', label: '🏛️ Instansi Publik' },
+];
+
+interface NicheIdea {
+  label: string;
+  category: string;
+  group: 'b2b' | 'health' | 'hospitality' | 'service' | 'gov';
+  icon: string;
+}
+
+const nicheIdeas: NicheIdea[] = [
+  // B2B & Tech
+  { label: 'Software House', category: 'Software House IT Konsultan', group: 'b2b', icon: '💻' },
+  { label: 'Agensi Marketing', category: 'Digital Marketing Agency', group: 'b2b', icon: '🚀' },
+  { label: 'Distributor / Supplier', category: 'Distributor Supplier', group: 'b2b', icon: '📦' },
+  { label: 'Kontraktor Bangunan', category: 'Kontraktor & Konstruksi', group: 'b2b', icon: '🏗️' },
+  { label: 'Pabrik & Manufaktur', category: 'Pabrik Manufaktur', group: 'b2b', icon: '🏭' },
+
+  // Kesehatan & Klinik
+  { label: 'Klinik Kecantikan', category: 'Klinik Kecantikan & Estetika', group: 'health', icon: '✨' },
+  { label: 'Klinik Gigi', category: 'Klinik Gigi Dental Care', group: 'health', icon: '🦷' },
+  { label: 'Rumah Sakit Swasta', category: 'Rumah Sakit Swasta', group: 'health', icon: '🏥' },
+
+  // Hospitality & F&B
+  { label: 'Hotel Bintang', category: 'Hotel Bintang', group: 'hospitality', icon: '🏨' },
+  { label: 'Restoran & Cafe', category: 'Restoran & Cafe', group: 'hospitality', icon: '☕' },
+  { label: 'Catering Service', category: 'Catering Service', group: 'hospitality', icon: '🍱' },
+
+  // Jasa Profesional
+  { label: 'Kantor Notaris', category: 'Kantor Notaris & PPAT', group: 'service', icon: '⚖️' },
+  { label: 'Konsultan Pajak', category: 'Konsultan Pajak & Keuangan', group: 'service', icon: '📊' },
+  { label: 'Arsitek & Interior', category: 'Arsitek Desain Interior', group: 'service', icon: '📐' },
+
+  // Instansi & Pendidikan
+  { label: 'Sekolah Swasta', category: 'Sekolah Swasta International School', group: 'gov', icon: '🎓' },
+  { label: 'Dinas Pendidikan', category: 'Dinas Pendidikan', group: 'gov', icon: '🏛️' },
+  { label: 'Dinas Kesehatan', category: 'Dinas Kesehatan', group: 'gov', icon: '🏥' },
+  { label: 'Kantor Dinas Pemda', category: 'Kantor Dinas Pemerintah', group: 'gov', icon: '🏛️' },
+];
+
+const visibleNiches = computed(() => {
+  if (activeNicheTab.value === 'all') return nicheIdeas;
+  return nicheIdeas.filter((n) => n.group === activeNicheTab.value);
+});
+
+const selectNiche = (category: string) => {
+  targetCategory.value = category;
+  showToast(`Kategori "${category}" dipilih`);
+};
+
+const searchQueryPreview = computed(() => {
+  const cat = targetCategory.value.trim();
+  const prov = targetProvince.value;
+  const city = targetCity.value.trim();
+
+  if (!cat && !prov && !city) {
+    return '';
+  }
+
+  const parts: string[] = [];
+  if (cat) {
+    parts.push(`"${cat}"`);
+  } else {
+    parts.push('Perusahaan & Bisnis');
+  }
+
+  if (city && prov) {
+    parts.push(`di ${city}, ${prov}`);
+  } else if (city) {
+    parts.push(`di ${city}`);
+  } else if (prov) {
+    parts.push(`di ${prov}`);
+  } else {
+    parts.push('(Seluruh Indonesia)');
+  }
+
+  return `Pencarian: ${parts.join(' ')} • Target: ${scrapeLimit.value} data prospek`;
+});
+
+const getWhatsAppUrl = (phone: string | null | undefined, businessName: string) => {
+  if (!phone) return null;
+  const cleaned = phone.replace(/[^0-9]/g, '');
+  let waNumber = '';
+  if (cleaned.startsWith('08')) {
+    waNumber = '62' + cleaned.slice(1);
+  } else if (cleaned.startsWith('628')) {
+    waNumber = cleaned;
+  } else if (cleaned.startsWith('8')) {
+    waNumber = '62' + cleaned;
+  }
+  if (!waNumber || waNumber.length < 10) return null;
+  const greeting = encodeURIComponent(`Halo ${businessName}, perkenalkan saya ingin menanyakan terkait penawaran & kerja sama...`);
+  return `https://wa.me/${waNumber}?text=${greeting}`;
+};
 
 // Selection state
 const selectedIds = ref<string[]>([]);
@@ -396,12 +593,6 @@ const toggleSelectAll = () => {
 
 const countByStatus = (status: string) => {
   return leads.value.filter((l) => (l.coldCallStatus || 'BELUM_DIHUBUNGI') === status).length;
-};
-
-const setPreset = (prov: string, cat: string, city: string = '') => {
-  targetProvince.value = prov;
-  targetCategory.value = cat;
-  targetCity.value = city;
 };
 
 const clearStatusFilter = () => {
@@ -574,9 +765,13 @@ const confirmBulkDelete = async () => {
   }
 };
 
-const copyPhone = (phone: string) => {
-  navigator.clipboard.writeText(phone);
-  alert(`Nomor disalin: ${phone}`);
+const copyPhone = async (phone: string) => {
+  try {
+    await navigator.clipboard.writeText(phone);
+    showToast(`Nomor telepon ${phone} berhasil disalin!`);
+  } catch {
+    showToast(`Nomor telepon: ${phone}`);
+  }
 };
 
 const exportData = async (format: 'xlsx' | 'csv') => {
@@ -644,133 +839,354 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #059669, #047857);
 }
 
-/* Scraper Panel */
-.scraper-panel {
-  padding: 20px 24px;
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  margin-bottom: 20px;
+/* Prospect Search Card & Command Center */
+.prospect-search-card {
+  padding: 24px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.9) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 36px -10px rgba(0, 0, 0, 0.6), 0 0 25px rgba(14, 165, 233, 0.08);
+  margin-bottom: 24px;
 }
-.scraper-header {
+
+.prospect-search-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 12px;
+  margin-bottom: 18px;
 }
-.scraper-title {
+
+.header-badge-title {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.scraper-title h3 {
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff;
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--accent-cyan);
+  animation: pulseGlow 2s infinite;
 }
-.scraper-badge {
-  background: rgba(14, 165, 233, 0.15);
-  color: var(--accent-cyan);
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+.badge-text {
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.5px;
-  padding: 4px 8px;
-  border-radius: 6px;
+  letter-spacing: 0.8px;
+  color: var(--accent-cyan);
+  background: rgba(14, 165, 233, 0.12);
   border: 1px solid rgba(14, 165, 233, 0.3);
+  padding: 3px 8px;
+  border-radius: 6px;
 }
-.quick-presets {
+
+.card-headline {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+
+.status-summary-tag {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-}
-.preset-chip {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-muted);
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.preset-chip:hover {
-  background: rgba(14, 165, 233, 0.2);
-  color: #fff;
-  border-color: var(--accent-cyan);
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
 }
 
-/* Form Grid */
-.scraper-form-grid {
+/* 1. Primary Hero Search Omnibar */
+.search-omnibar-group {
+  margin-bottom: 16px;
+}
+
+.omnibar-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.search-omnibar {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.omnibar-icon {
+  position: absolute;
+  left: 16px;
+  font-size: 18px;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.omnibar-input {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1.5px solid rgba(56, 189, 248, 0.3);
+  border-radius: var(--radius-md);
+  padding: 14px 44px 14px 48px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.omnibar-input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.35), 0 4px 16px rgba(0, 0, 0, 0.4);
+  background: rgba(15, 23, 42, 1);
+}
+
+.omnibar-clear {
+  position: absolute;
+  right: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: var(--text-muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.omnibar-clear:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+}
+
+/* 2. Parameter Controls Row */
+.search-parameters-row {
   display: grid;
-  grid-template-columns: 1.5fr 2fr 1.3fr 1fr 1.3fr;
+  grid-template-columns: 1.4fr 1.3fr 1.5fr 1.2fr;
   gap: 14px;
   align-items: flex-end;
+  margin-bottom: 16px;
 }
-.form-group {
+
+.param-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.flex-2 {
-  flex: 2;
-}
-.form-label {
+
+.param-label {
   font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.5px;
 }
-.province-select {
-  font-weight: 600;
-  color: #38bdf8;
-}
-.search-input-wrapper {
-  position: relative;
-}
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 15px;
-}
-.scrape-input {
-  width: 100%;
-  background: rgba(15, 23, 42, 0.8);
+
+.param-select {
+  background: rgba(15, 23, 42, 0.85);
   border: 1px solid var(--border-card);
-  padding: 10px 14px 10px 38px;
+  color: #38bdf8;
+  font-weight: 600;
+  height: 42px;
+}
+
+.param-input {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--border-card);
+  height: 42px;
+}
+
+.limit-chips {
+  display: flex;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.7);
+  padding: 4px;
   border-radius: var(--radius-md);
+  border: 1px solid var(--border-card);
+  height: 42px;
+  align-items: center;
+}
+
+.limit-chip {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.limit-chip:hover {
   color: #fff;
-  font-size: 13px;
-  outline: none;
-  transition: var(--transition);
+  background: rgba(255, 255, 255, 0.05);
 }
-.scrape-input:focus {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
+
+.limit-chip.active {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.3), rgba(2, 132, 199, 0.3));
+  border: 1px solid var(--accent-cyan);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);
 }
-.scrape-submit-btn {
-  padding: 10px 16px;
-  font-size: 13px;
+
+.prospect-search-btn {
+  height: 42px;
+  font-size: 14px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 42px;
+  width: 100%;
 }
-.spinner-small {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+
+/* 3. Niche Inspiration Section */
+.niche-inspiration-section {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
 }
-@keyframes spin {
-  to { transform: rotate(360deg); }
+
+.niche-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.niche-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.niche-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.niche-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.niche-tab-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.niche-tab-btn.active {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.3);
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.niche-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.niche-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.niche-pill:hover {
+  background: rgba(14, 165, 233, 0.18);
+  border-color: var(--accent-cyan);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.niche-pill.selected {
+  background: rgba(14, 165, 233, 0.25);
+  border-color: var(--accent-cyan);
+  color: #38bdf8;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);
+}
+
+/* 4. Live Search Preview Bar */
+.search-preview-bar {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px dashed rgba(56, 189, 248, 0.25);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.preview-active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.preview-text {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.preview-idle {
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .scrape-alert {
@@ -943,6 +1359,64 @@ onUnmounted(() => {
 }
 .copy-btn:hover {
   opacity: 1;
+}
+
+/* Phone & WhatsApp outreach container */
+.phone-action-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  width: fit-content;
+  transition: all 0.2s;
+}
+
+.wa-btn:hover {
+  background: rgba(34, 197, 94, 0.25);
+  color: #fff;
+  border-color: #4ade80;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+}
+
+/* Floating Toast Notification */
+.floating-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #1e293b;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-cyan);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(14, 165, 233, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 9999;
+}
+
+.toast-fade-enter-active, .toast-fade-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toast-fade-enter-from, .toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(15px);
 }
 
 /* Status Dropdown */
